@@ -1,0 +1,22 @@
+ARCHITECTURE.md
+
+# Keys
+*.json
+!package.json
+!tsconfig.json
+
+# Local Ledger
+test-ledger/
+
+# Build Artifacts
+target/
+.anchor/
+node_modules/
+
+# Environment
+.env
+.env.local
+
+# Rust
+debug/
+**/*.rs.bk
