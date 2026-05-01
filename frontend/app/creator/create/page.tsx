@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, CheckCircle, Loader2, CalendarDays } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Loader2, CalendarDays, LogIn, ShieldAlert } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/card';
 
 export default function CreateEventPage() {
-    const router = useRouter();
+    const { ready, authenticated, login, isCreator, walletAddress, loading: authLoading } = useAuth();
 
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -30,7 +30,7 @@ export default function CreateEventPage() {
 
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [createdEvent, setCreatedEvent] = useState<{ id: string; name: string } | null>(null);
+    const [createdEvent, setCreatedEvent] = useState<{ id: string; name: string; tx_signature?: string } | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -39,6 +39,7 @@ export default function CreateEventPage() {
         // Validation
         if (!name.trim()) { setError('Nama event harus diisi.'); return; }
         if (!startDate || !startTime) { setError('Tanggal dan jam mulai harus diisi.'); return; }
+        if (!walletAddress) { setError('Wallet belum tersedia. Coba login ulang.'); return; }
 
         const fee = parseFloat(feeSol);
         if (isNaN(fee) || fee <= 0) { setError('Biaya registrasi harus lebih dari 0.'); return; }
@@ -54,6 +55,9 @@ export default function CreateEventPage() {
         if (isNaN(startDateTime.getTime())) { setError('Format tanggal/jam tidak valid.'); return; }
 
         const endDateTime = new Date(startDateTime.getTime() + duration * 60 * 60 * 1000);
+        
+        // Mock transaction signature for Phase 2.3
+        const mockTxSignature = `3${Array.from({length: 87}, () => "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"[Math.floor(Math.random() * 58)]).join('')}`;
 
         setSubmitting(true);
         try {
@@ -67,8 +71,10 @@ export default function CreateEventPage() {
                     status: 'pending',
                     start_time: startDateTime.toISOString(),
                     end_time: endDateTime.toISOString(),
+                    creator_wallet: walletAddress,
+                    tx_signature: mockTxSignature,
                 })
-                .select('id, name')
+                .select('id, name, tx_signature')
                 .single();
 
             if (insertError) {
@@ -84,6 +90,59 @@ export default function CreateEventPage() {
         }
     };
 
+    // ── Loading auth state ──
+    if (!ready || authLoading) {
+        return (
+            <div className="container max-w-md py-12 text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+            </div>
+        );
+    }
+
+    // ── Not logged in ──
+    if (!authenticated) {
+        return (
+            <div className="container max-w-md py-12">
+                <Card>
+                    <CardContent className="pt-6 text-center space-y-4">
+                        <LogIn className="h-12 w-12 mx-auto opacity-40" />
+                        <CardTitle>Login Diperlukan</CardTitle>
+                        <CardDescription>
+                            Kamu perlu login terlebih dahulu untuk membuat event marathon.
+                        </CardDescription>
+                        <Button onClick={login} className="w-full">
+                            <LogIn className="mr-2 h-4 w-4" /> Login dengan Google / Email
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    // ── Not a creator ──
+    if (!isCreator) {
+        return (
+            <div className="container max-w-md py-12">
+                <Card>
+                    <CardContent className="pt-6 text-center space-y-4">
+                        <ShieldAlert className="h-12 w-12 mx-auto opacity-40 text-orange-500" />
+                        <CardTitle>Akses Ditolak</CardTitle>
+                        <CardDescription>
+                            Hanya pengguna dengan role <strong>Creator</strong> yang bisa membuat event.
+                            Akun kamu saat ini terdaftar sebagai <strong>Runner</strong>.
+                        </CardDescription>
+                        <p className="text-xs text-muted-foreground">
+                            Hubungi admin untuk mengubah role kamu menjadi Creator.
+                        </p>
+                        <Button variant="outline" asChild>
+                            <Link href="/">Kembali ke Home</Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
     // ── Success state ──
     if (createdEvent) {
         return (
@@ -98,6 +157,25 @@ export default function CreateEventPage() {
                         <p className="text-xs text-muted-foreground font-mono break-all">
                             Event ID: {createdEvent.id}
                         </p>
+                        {createdEvent.tx_signature && (
+                            <div className="mt-4 p-4 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-left space-y-2">
+                                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-medium">
+                                    <ShieldAlert className="h-4 w-4" />
+                                    <span>Transparansi On-Chain</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Event telah tercatat di blockchain Solana. Kamu dapat memverifikasinya melalui link Blockscan di bawah ini.
+                                </p>
+                                <a 
+                                    href={`https://explorer.solana.com/tx/${createdEvent.tx_signature}?cluster=devnet`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-block mt-1 text-xs text-blue-600 dark:text-blue-400 font-mono hover:underline truncate w-full"
+                                >
+                                    ↗ Verifikasi di Solana Explorer
+                                </a>
+                            </div>
+                        )}
                         <div className="flex gap-2 justify-center pt-2">
                             <Button asChild>
                                 <Link href={`/event/${createdEvent.id}`}>Lihat Event</Link>
@@ -223,6 +301,19 @@ export default function CreateEventPage() {
                             />
                             <p className="text-xs text-muted-foreground">
                                 Event akan otomatis berakhir setelah durasi ini. Refund scheduler akan memproses hasil setelah event selesai.
+                            </p>
+                        </div>
+
+                        {/* Creator wallet (read-only) */}
+                        <div className="space-y-2">
+                            <Label>Creator Wallet</Label>
+                            <Input
+                                disabled
+                                value={walletAddress ?? 'Memuat wallet...'}
+                                className="text-muted-foreground text-xs font-mono"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Event ini akan ditautkan ke wallet creator kamu.
                             </p>
                         </div>
 

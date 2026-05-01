@@ -16,6 +16,8 @@ export interface RaceEvent {
     registration_fee_sol: number;
     max_participants: number;
     vault_address: string | null;
+    creator_wallet: string | null;
+    tx_signature?: string | null;
     created_at: string;
 }
 
@@ -27,6 +29,7 @@ export interface Runner {
     event_id: string;
     status: 'registered' | 'running' | 'finished' | 'disqualified';
     finish_position: number | null;
+    tx_signature?: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -38,3 +41,12 @@ export interface RaceLog {
     timestamp: string;
     created_at: string;
 }
+
+export interface SolaRunUser {
+    id: string;
+    privy_id: string;
+    wallet_address: string;
+    role: 'creator' | 'runner';
+    created_at: string;
+}
+

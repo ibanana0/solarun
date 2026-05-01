@@ -1,8 +1,9 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use crate::{Event, EventStatus};
 use crate::error::ErrorCode;
 
-/// Process refunds and prize distribution for completed event
+/// Process refunds and prize distribution (USDC) for completed event
 #[derive(Accounts)]
 #[instruction(event_id: String)]
 pub struct ProcessRefunds<'info> {
@@ -17,11 +18,15 @@ pub struct ProcessRefunds<'info> {
     )]
     pub event: Account<'info, Event>,
 
-    /// CHECK: Vault account is managed by the program to store SOL. It does not need a specific data structure.
-    #[account(mut)]
-    pub vault: UncheckedAccount<'info>,
+    /// Vault token account holding deposited USDC.
+    #[account(
+        mut,
+        seeds = [b"vault", event.key().as_ref()],
+        bump = event.vault_bump,
+    )]
+    pub vault: Account<'info, TokenAccount>,
 
-    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -30,33 +35,66 @@ pub struct FinisherData {
     pub position: u8,
 }
 
-pub fn handler(
-    ctx: Context<ProcessRefunds>,
+pub fn handler<'info>(
+    ctx: Context<'info, ProcessRefunds<'info>>,
     event_id: String,
     _finishers: Vec<FinisherData>,
     _non_finishers: Vec<String>,
     _recipient_wallets: Vec<Pubkey>,
     amounts: Vec<u64>,
 ) -> Result<()> {
-    let event = &mut ctx.accounts.event;
+    // Read event data we need BEFORE taking mutable reference
+    let event_id_str = ctx.accounts.event.event_id.clone();
+    let event_bump = ctx.accounts.event.bump;
+    let vault_balance = ctx.accounts.vault.amount;
 
-    if event.event_id != event_id {
+    if event_id_str != event_id {
         return Err(ErrorCode::RefundEventNotFound.into());
     }
 
-    let vault_balance = ctx.accounts.vault.lamports();
     let total_to_distribute: u64 = amounts.iter().sum();
-    
     if total_to_distribute > vault_balance {
         return Err(ErrorCode::ArithmeticOverflow.into());
     }
 
+    let remaining_accounts = ctx.remaining_accounts;
+    if remaining_accounts.len() != amounts.len() {
+        return Err(ErrorCode::ArithmeticOverflow.into());
+    }
+
+    // Event PDA is the vault token authority; sign with event seeds
+    let signer_seeds: &[&[u8]] = &[b"event", event_id.as_bytes(), &[event_bump]];
+    let signer = &[signer_seeds];
+
+    let event_info = ctx.accounts.event.to_account_info();
+    let vault_info = ctx.accounts.vault.to_account_info();
+    let token_program_key = ctx.accounts.token_program.key();
+
+    for (i, recipient_ata) in remaining_accounts.iter().enumerate() {
+        let amount = amounts[i];
+        if amount > 0 {
+            let cpi_accounts = Transfer {
+                from: vault_info.clone(),
+                to: recipient_ata.to_account_info(),
+                authority: event_info.clone(),
+            };
+            let cpi_ctx = CpiContext::new_with_signer(
+                token_program_key,
+                cpi_accounts,
+                signer,
+            );
+            token::transfer(cpi_ctx, amount)?;
+        }
+    }
+
+    // Now take mutable reference for status update
+    let event = &mut ctx.accounts.event;
     event.status = EventStatus::Settled;
 
     emit!(RefundsProcessed {
         event_id: event_id.clone(),
         total_distributed: total_to_distribute,
-        finisher_count: 0,
+        finisher_count: remaining_accounts.len() as u32,
         non_finisher_count: 0,
     });
 

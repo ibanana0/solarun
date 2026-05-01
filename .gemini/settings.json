@@ -1,0 +1,37 @@
+{
+  "general": {
+    "plan": {
+      "enabled": false
+    }
+  },
+  "ui": {
+    "showStatusInTitle": true,
+    "hideTips": true,
+    "hideContextSummary": false,
+    "showMemoryUsage": true,
+    "showCitations": true,
+    "showShortcutsHint": false,
+    "footer": {
+      "hideContextPercentage": false,
+      "hideModelInfo": false
+    }
+  },
+  "context": {
+    "fileFiltering": {
+      "respectGitIgnore": false
+    },
+    "loadMemoryFromIncludeDirectories": true
+  },
+  "experimental": {
+    "autoMemory": true
+  },
+  "mcpServers": {
+    "context7": {
+      "httpUrl": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}",
+        "Accept": "application/json, text/event-stream"
+      }
+    }
+  }
+}

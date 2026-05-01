@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { Plus, Users, Trophy, Eye, ArrowLeft, Loader2 } from 'lucide-react';
-import { useEvents } from '@/hooks/useEvent';
+import { Plus, Trophy, Eye, ArrowLeft, Loader2, LogIn, ShieldAlert, Trash } from 'lucide-react';
+import { useCreatorEvents } from '@/hooks/useEvent';
+import { useAuth } from '@/hooks/useAuth';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -10,7 +11,6 @@ import {
     Card,
     CardContent,
     CardDescription,
-    CardFooter,
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
@@ -56,6 +56,14 @@ function EventRow({ event }: { event: RaceEvent }) {
                             <Eye className="h-4 w-4" />
                         </Link>
                     </Button>
+                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => {
+                        if(confirm('Are you sure you want to delete this event? This will refund all participants.')) {
+                            // TODO: Add delete logic here
+                            console.log('Delete event', event.id);
+                        }
+                    }}>
+                        <Trash className="h-4 w-4" />
+                    </Button>
                 </div>
             </TableCell>
         </TableRow>
@@ -63,12 +71,67 @@ function EventRow({ event }: { event: RaceEvent }) {
 }
 
 export default function CreatorDashboard() {
-    const { data: events, isLoading, error } = useEvents();
+    const { ready, authenticated, login, isCreator, walletAddress, loading: authLoading } = useAuth();
+    const { data: events, isLoading, error } = useCreatorEvents(walletAddress);
 
     const totalEvents = events?.length ?? 0;
     const activeEvents = events?.filter((e) => e.status === 'active').length ?? 0;
     const completedEvents = events?.filter((e) => e.status === 'completed' || e.status === 'settled').length ?? 0;
 
+    // ── Loading auth state ──
+    if (!ready || authLoading) {
+        return (
+            <div className="container max-w-md py-12 text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+            </div>
+        );
+    }
+
+    // ── Not logged in ──
+    if (!authenticated) {
+        return (
+            <div className="container max-w-md py-12">
+                <Card>
+                    <CardContent className="pt-6 text-center space-y-4">
+                        <LogIn className="h-12 w-12 mx-auto opacity-40" />
+                        <CardTitle>Login Diperlukan</CardTitle>
+                        <CardDescription>
+                            Kamu perlu login terlebih dahulu untuk mengakses Creator Dashboard.
+                        </CardDescription>
+                        <Button onClick={login} className="w-full">
+                            <LogIn className="mr-2 h-4 w-4" /> Login dengan Google / Email
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    // ── Not a creator ──
+    if (!isCreator) {
+        return (
+            <div className="container max-w-md py-12">
+                <Card>
+                    <CardContent className="pt-6 text-center space-y-4">
+                        <ShieldAlert className="h-12 w-12 mx-auto opacity-40 text-orange-500" />
+                        <CardTitle>Akses Ditolak</CardTitle>
+                        <CardDescription>
+                            Halaman ini hanya bisa diakses oleh pengguna dengan role <strong>Creator</strong>.
+                            Akun kamu saat ini terdaftar sebagai <strong>Runner</strong>.
+                        </CardDescription>
+                        <p className="text-xs text-muted-foreground">
+                            Hubungi admin untuk mengubah role kamu menjadi Creator.
+                        </p>
+                        <Button variant="outline" asChild>
+                            <Link href="/">Kembali ke Home</Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    // ── Creator Dashboard ──
     return (
         <div className="container py-8 space-y-8">
             {/* Header */}

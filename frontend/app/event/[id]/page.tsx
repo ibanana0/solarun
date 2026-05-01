@@ -76,6 +76,16 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                     )}
                 </div>
                 <h1 className="text-3xl font-bold tracking-tight">{event.name}</h1>
+                {event.tx_signature && (
+                    <a 
+                        href={`https://explorer.solana.com/tx/${event.tx_signature}?cluster=devnet`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center text-xs font-mono text-blue-600 dark:text-blue-400 hover:underline bg-blue-50/50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 px-2.5 py-1 rounded-md w-fit transition-colors"
+                    >
+                        🔗 Verifikasi Event di Blockscan
+                    </a>
+                )}
                 {event.description && (
                     <p className="text-muted-foreground max-w-xl">{event.description}</p>
                 )}

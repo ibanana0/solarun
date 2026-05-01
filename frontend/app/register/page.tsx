@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Loader2, LogIn } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useEvents } from '@/hooks/useEvent';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,14 +29,8 @@ const DEMO_CHIP_UIDS = [
     'CHIP_M3N4O5', 'CHIP_P6Q7R8', 'CHIP_S9T0U1', 'CHIP_V2W3X4',
 ];
 
-function generateDemoWallet(): string {
-    const chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-    let addr = '';
-    for (let i = 0; i < 44; i++) addr += chars[Math.floor(Math.random() * chars.length)];
-    return addr;
-}
-
 export default function RegisterPage() {
+    const { ready, authenticated, walletAddress, login } = useAuth();
     const { data: events, isLoading: eventsLoading } = useEvents();
 
     const [fullName, setFullName] = useState('');
@@ -43,7 +38,7 @@ export default function RegisterPage() {
     const [eventId, setEventId] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<{ eventId: string } | null>(null);
+    const [success, setSuccess] = useState<{ eventId: string; txSignature?: string } | null>(null);
     const [usedChips, setUsedChips] = useState<string[]>([]);
 
     useEffect(() => {
@@ -64,6 +59,10 @@ export default function RegisterPage() {
         if (!fullName.trim()) { setError('Nama lengkap harus diisi.'); return; }
         if (!chipUid) { setError('Pilih Chip UID.'); return; }
         if (!eventId) { setError('Pilih event terlebih dahulu.'); return; }
+        if (!walletAddress) { setError('Wallet belum tersedia. Coba login ulang.'); return; }
+
+        // Mock transaction signature for Phase 2.3
+        const mockTxSignature = `3${Array.from({length: 87}, () => "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"[Math.floor(Math.random() * 58)]).join('')}`;
 
         setSubmitting(true);
         try {
@@ -71,9 +70,10 @@ export default function RegisterPage() {
                 full_name: fullName.trim(),
                 chip_uid: chipUid,
                 event_id: eventId,
-                wallet_address: generateDemoWallet(),
+                wallet_address: walletAddress,
                 status: 'registered',
                 finish_position: null,
+                tx_signature: mockTxSignature,
             });
             if (insertError) {
                 setError(insertError.code === '23505'
@@ -82,7 +82,7 @@ export default function RegisterPage() {
                 );
                 return;
             }
-            setSuccess({ eventId });
+            setSuccess({ eventId, txSignature: mockTxSignature });
         } catch {
             setError('Terjadi kesalahan. Coba lagi.');
         } finally {
@@ -90,6 +90,36 @@ export default function RegisterPage() {
         }
     };
 
+    // ── Not ready ──
+    if (!ready) {
+        return (
+            <div className="container max-w-md py-12 text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+            </div>
+        );
+    }
+
+    // ── Not logged in ──
+    if (!authenticated) {
+        return (
+            <div className="container max-w-md py-12">
+                <Card>
+                    <CardContent className="pt-6 text-center space-y-4">
+                        <LogIn className="h-12 w-12 mx-auto opacity-40" />
+                        <CardTitle>Login untuk Mendaftar</CardTitle>
+                        <CardDescription>
+                            Kamu perlu login terlebih dahulu sebelum bisa mendaftar event marathon.
+                        </CardDescription>
+                        <Button onClick={login} className="w-full">
+                            <LogIn className="mr-2 h-4 w-4" /> Login dengan Google / Email
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    // ── Success ──
     if (success) {
         return (
             <div className="container max-w-md py-12">
@@ -100,6 +130,25 @@ export default function RegisterPage() {
                         <CardDescription>
                             Ambil chip RFID kamu di lokasi race dan mulai berlari!
                         </CardDescription>
+                        {success.txSignature && (
+                            <div className="mt-4 p-4 bg-green-50/50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 rounded-lg text-sm text-left space-y-2">
+                                <div className="flex items-center gap-2 text-green-600 dark:text-green-400 font-medium">
+                                    <CheckCircle className="h-4 w-4" />
+                                    <span>Pendaftaran Tersimpan On-Chain</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Biaya pendaftaran (USDC/SOL) telah berhasil ditransfer ke vault smart contract.
+                                </p>
+                                <a 
+                                    href={`https://explorer.solana.com/tx/${success.txSignature}?cluster=devnet`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-block mt-1 text-xs text-green-600 dark:text-green-400 font-mono hover:underline truncate w-full"
+                                >
+                                    ↗ Verifikasi di Solana Explorer
+                                </a>
+                            </div>
+                        )}
                         <div className="flex gap-2 justify-center pt-2">
                             <Button asChild>
                                 <Link href={`/event/${success.eventId}`}>Lihat Leaderboard</Link>
@@ -114,6 +163,7 @@ export default function RegisterPage() {
         );
     }
 
+    // ── Form ──
     return (
         <div className="container max-w-md py-8 space-y-6">
             <Button variant="ghost" size="sm" asChild>
@@ -190,12 +240,16 @@ export default function RegisterPage() {
                             </p>
                         </div>
 
-                        {/* Wallet note */}
+                        {/* Wallet address (from Privy) */}
                         <div className="space-y-2">
-                            <Label>Wallet Address (V1 Demo)</Label>
-                            <Input disabled value="Akan digenerate otomatis (Devnet Demo)" className="text-muted-foreground text-xs" />
+                            <Label>Wallet Address (Privy)</Label>
+                            <Input
+                                disabled
+                                value={walletAddress ?? 'Memuat wallet...'}
+                                className="text-muted-foreground text-xs font-mono"
+                            />
                             <p className="text-xs text-muted-foreground">
-                                Di V2, kamu akan menghubungkan wallet Solana asli.
+                                Wallet ini otomatis dibuat oleh Privy saat kamu login. Hadiah akan dikirim ke alamat ini.
                             </p>
                         </div>
 

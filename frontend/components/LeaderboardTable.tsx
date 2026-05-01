@@ -59,6 +59,7 @@ export function LeaderboardTable({ runners, isLoading }: LeaderboardTableProps) 
                         <TableHead>Status</TableHead>
                         <TableHead>Checkpoint</TableHead>
                         <TableHead>Wallet</TableHead>
+                        <TableHead className="text-right">On-Chain Tx</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -94,6 +95,21 @@ export function LeaderboardTable({ runners, isLoading }: LeaderboardTableProps) 
                                 </TableCell>
                                 <TableCell className="font-mono text-xs text-muted-foreground">
                                     {runner.wallet_address.slice(0, 6)}...{runner.wallet_address.slice(-4)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    {runner.tx_signature ? (
+                                        <a 
+                                            href={`https://explorer.solana.com/tx/${runner.tx_signature}?cluster=devnet`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-mono text-xs underline decoration-blue-500/30 underline-offset-2"
+                                            title="Verifikasi Transaksi"
+                                        >
+                                            View Tx
+                                        </a>
+                                    ) : (
+                                        <span className="text-muted-foreground text-xs opacity-50">—</span>
+                                    )}
                                 </TableCell>
                             </TableRow>
                         );

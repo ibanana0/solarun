@@ -34,3 +34,21 @@ export function useEvent(id: string) {
         enabled: !!id,
     });
 }
+
+export function useCreatorEvents(walletAddress: string | null) {
+    return useQuery<RaceEvent[]>({
+        queryKey: ['creator-events', walletAddress],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('race_events')
+                .select('*')
+                .eq('creator_wallet', walletAddress!)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data ?? [];
+        },
+        enabled: !!walletAddress,
+    });
+}
+

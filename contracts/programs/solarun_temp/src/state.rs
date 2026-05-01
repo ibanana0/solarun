@@ -7,14 +7,17 @@ use anchor_lang::prelude::*;
 #[account]
 pub struct Event {
     pub event_id: String,           // UUID, max 36 chars
-    pub vault: Pubkey,              // PDA vault address
+    pub vault: Pubkey,              // PDA vault token account address
     pub admin: Pubkey,              // Event creator
+    pub mint: Pubkey,               // Mock USDC mint address
     pub status: EventStatus,        // Initialized, Active, Completed, Settled
     pub participant_count: u32,     // Total registered
-    pub total_deposits: u64,        // Total SOL in vault (lamports)
+    pub total_deposits: u64,        // Total USDC in vault (token units)
+    pub registration_fee: u64,      // Fee per participant (token units)
     pub start_time: i64,            // Unix timestamp
     pub end_time: i64,              // Unix timestamp
     pub bump: u8,                   // PDA bump seed
+    pub vault_bump: u8,             // PDA vault bump seed
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]

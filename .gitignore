@@ -2,5 +2,6 @@ solarun_overview.md
 solarun_sprint.md
 .env
 node_modules/
-supabase_migration.sql
+*.sql
 ARCHITECTURE.md
+gemini*
