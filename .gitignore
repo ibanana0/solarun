@@ -5,3 +5,4 @@ node_modules/
 *.sql
 ARCHITECTURE.md
 gemini*
+.gemini

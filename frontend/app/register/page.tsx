@@ -69,27 +69,29 @@ export default function RegisterPage() {
         if (!walletAddress || !program) { setError('Wallet/Program belum tersedia. Coba login ulang.'); return; }
 
         const runnerUuid = uuidv4();
-        const selectedEvent = activeEvents.find(e => e.id === eventId);
-        if (!selectedEvent) { setError('Event tidak ditemukan.'); return; }
+        const runnerId = runnerUuid.replace(/-/g, '');
+        const blockchainEventId = eventId.replace(/-/g, '');
 
         setSubmitting(true);
         try {
             // 1. Prepare On-Chain Instruction
             const programId = program.programId;
-            const runner = new PublicKey(walletAddress);
+            // IMPORTANT: Use provider.wallet.publicKey to ensure it matches the actual signer
+            const runner = program.provider.publicKey;
 
             // Derive PDAs
             const [participantPda] = PublicKey.findProgramAddressSync(
-                [Buffer.from('participant'), Buffer.from(eventId), Buffer.from(runnerUuid)],
+                [Buffer.from('participant'), Buffer.from(blockchainEventId), Buffer.from(runnerId)],
                 programId
             );
             const [eventPda] = PublicKey.findProgramAddressSync(
-                [Buffer.from('event'), Buffer.from(eventId)],
-                programId
+                [Buffer.from('event'), Buffer.from(blockchainEventId)],
+                program.programId
             );
+
             const [vaultPda] = PublicKey.findProgramAddressSync(
-                [Buffer.from('vault'), Buffer.from(eventId)],
-                programId
+                [Buffer.from('vault'), eventPda.toBuffer()],
+                program.programId
             );
             const [mockUsdcMint] = PublicKey.findProgramAddressSync(
                 [Buffer.from('mock_usdc_mint')],
@@ -102,18 +104,18 @@ export default function RegisterPage() {
             // 2. Execute On-Chain Transaction
             const txSignature = await program.methods
                 .registerParticipant(
-                    eventId,
+                    blockchainEventId,
                     chipUid,
                     runner,
                     fullName.trim(),
-                    runnerUuid
+                    runnerUuid // Keep the 36-char ID in the account data if that's what the contract expects
                 )
                 .accounts({
                     runner,
                     participant: participantPda,
                     event: eventPda,
                     vault: vaultPda,
-                    runnerTokenAccount: userAta, // Corrected key name from IDL
+                    runnerTokenAccount: userAta,
                     systemProgram: anchor.web3.SystemProgram.programId,
                     tokenProgram: TOKEN_PROGRAM_ID,
                 } as any)
@@ -198,7 +200,7 @@ export default function RegisterPage() {
                                 <p className="text-xs text-muted-foreground">
                                     Biaya pendaftaran (USDC/SOL) telah berhasil ditransfer ke vault smart contract.
                                 </p>
-                                <a 
+                                <a
                                     href={`https://explorer.solana.com/tx/${success.txSignature}?cluster=devnet`}
                                     target="_blank"
                                     rel="noreferrer"

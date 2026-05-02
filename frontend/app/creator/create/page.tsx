@@ -62,22 +62,26 @@ export default function CreateEventPage() {
         if (isNaN(startDateTime.getTime())) { setError('Format tanggal/jam tidak valid.'); return; }
 
         const endDateTime = new Date(startDateTime.getTime() + duration * 60 * 60 * 1000);
-        
-        const eventUuid = uuidv4();
+
+        const rawUuid = uuidv4();
+        // Remove hyphens to get exactly 32 characters (16 bytes if hex, but here it's 32 bytes as string)
+        // Solana limits seeds to 32 bytes. UUID with hyphens is 36.
+        const eventId = rawUuid.replace(/-/g, '');
 
         setSubmitting(true);
         try {
             // 1. Prepare On-Chain Instruction
             const programId = program.programId;
-            const admin = new PublicKey(walletAddress);
+            // IMPORTANT: Use provider.wallet.publicKey to ensure it matches the actual signer
+            const admin = program.provider.publicKey;
 
             // Derive PDAs
             const [eventPda] = PublicKey.findProgramAddressSync(
-                [Buffer.from('event'), Buffer.from(eventUuid)],
+                [Buffer.from('event'), Buffer.from(eventId)],
                 programId
             );
             const [vaultPda] = PublicKey.findProgramAddressSync(
-                [Buffer.from('vault'), Buffer.from(eventUuid)],
+                [Buffer.from('vault'), eventPda.toBuffer()],
                 programId
             );
             const [mockUsdcMint] = PublicKey.findProgramAddressSync(
@@ -88,14 +92,14 @@ export default function CreateEventPage() {
             // 2. Execute On-Chain Transaction
             const txSignature = await program.methods
                 .initializeEvent(
-                    eventUuid,
+                    eventId,
                     new anchor.BN(max),
                     new anchor.BN(fee * 1_000_000), // 6 decimals
                     new anchor.BN(Math.floor(startDateTime.getTime() / 1000)),
                     new anchor.BN(Math.floor(endDateTime.getTime() / 1000))
                 )
                 .accounts({
-                    admin,
+                    admin, // Now guaranteed to match the signer
                     event: eventPda,
                     vault: vaultPda,
                     mockUsdcMint,
@@ -110,10 +114,10 @@ export default function CreateEventPage() {
             const { data, error: insertError } = await supabase
                 .from('race_events')
                 .insert({
-                    id: eventUuid,
+                    id: rawUuid, // Keep original UUID in DB for reference
                     name: name.trim(),
                     description: description.trim() || null,
-                    registration_fee_sol: fee, // Storing as 'fee' in this field for now (refactoring column name later)
+                    registration_fee_sol: fee,
                     max_participants: max,
                     status: 'pending',
                     start_time: startDateTime.toISOString(),
@@ -215,7 +219,7 @@ export default function CreateEventPage() {
                                 <p className="text-xs text-muted-foreground">
                                     Event telah tercatat di blockchain Solana. Kamu dapat memverifikasinya melalui link Blockscan di bawah ini.
                                 </p>
-                                <a 
+                                <a
                                     href={`https://explorer.solana.com/tx/${createdEvent.tx_signature}?cluster=devnet`}
                                     target="_blank"
                                     rel="noreferrer"

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { Plus, Trophy, Eye, ArrowLeft, Loader2, LogIn, ShieldAlert, Trash } from 'lucide-react';
 import { useCreatorEvents } from '@/hooks/useEvent';
 import { useAuth } from '@/hooks/useAuth';
@@ -31,7 +32,41 @@ function formatDate(dateStr: string) {
     });
 }
 
-function EventRow({ event }: { event: RaceEvent }) {
+function EventRow({ event, onEventDeleted }: { event: RaceEvent; onEventDeleted?: () => void }) {
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleDeleteEvent = async () => {
+        if (!confirm('Are you sure you want to delete this event? This will refund all participants.')) {
+            return;
+        }
+
+        setIsDeleting(true);
+
+        try {
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+            const response = await fetch(`${backendUrl}/api/events/${event.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                alert(`✅ Event deleted successfully!\n\nParticipants refunded: ${data.details?.participantsRefunded || 0}`);
+                onEventDeleted?.();
+            } else {
+                alert(`❌ Failed to delete event: ${data.message}`);
+            }
+        } catch (error) {
+            alert(`❌ Error deleting event: ${error}`);
+            console.error('Delete event error:', error);
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     return (
         <TableRow>
             <TableCell className="font-medium max-w-[200px] truncate">
@@ -56,13 +91,18 @@ function EventRow({ event }: { event: RaceEvent }) {
                             <Eye className="h-4 w-4" />
                         </Link>
                     </Button>
-                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => {
-                        if(confirm('Are you sure you want to delete this event? This will refund all participants.')) {
-                            // TODO: Add delete logic here
-                            console.log('Delete event', event.id);
-                        }
-                    }}>
-                        <Trash className="h-4 w-4" />
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={handleDeleteEvent}
+                        disabled={isDeleting}
+                    >
+                        {isDeleting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Trash className="h-4 w-4" />
+                        )}
                     </Button>
                 </div>
             </TableCell>
@@ -72,7 +112,7 @@ function EventRow({ event }: { event: RaceEvent }) {
 
 export default function CreatorDashboard() {
     const { ready, authenticated, login, isCreator, walletAddress, loading: authLoading } = useAuth();
-    const { data: events, isLoading, error } = useCreatorEvents(walletAddress);
+    const { data: events, isLoading, error, refetch } = useCreatorEvents(walletAddress);
 
     const totalEvents = events?.length ?? 0;
     const activeEvents = events?.filter((e) => e.status === 'active').length ?? 0;
@@ -233,7 +273,11 @@ export default function CreatorDashboard() {
                             </TableHeader>
                             <TableBody>
                                 {events.map((event) => (
-                                    <EventRow key={event.id} event={event} />
+                                    <EventRow
+                                        key={event.id}
+                                        event={event}
+                                        onEventDeleted={() => refetch?.()}
+                                    />
                                 ))}
                             </TableBody>
                         </Table>

@@ -77,7 +77,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                 </div>
                 <h1 className="text-3xl font-bold tracking-tight">{event.name}</h1>
                 {event.tx_signature && (
-                    <a 
+                    <a
                         href={`https://explorer.solana.com/tx/${event.tx_signature}?cluster=devnet`}
                         target="_blank"
                         rel="noreferrer"

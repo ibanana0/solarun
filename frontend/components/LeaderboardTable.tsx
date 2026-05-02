@@ -90,15 +90,15 @@ export function LeaderboardTable({ runners, isLoading }: LeaderboardTableProps) 
                                     {runner.status === 'registered'
                                         ? '—'
                                         : runner.status === 'finished'
-                                        ? CHECKPOINT_LABELS[2]
-                                        : CHECKPOINT_LABELS[1] ?? '—'}
+                                            ? CHECKPOINT_LABELS[2]
+                                            : CHECKPOINT_LABELS[1] ?? '—'}
                                 </TableCell>
                                 <TableCell className="font-mono text-xs text-muted-foreground">
                                     {runner.wallet_address.slice(0, 6)}...{runner.wallet_address.slice(-4)}
                                 </TableCell>
                                 <TableCell className="text-right">
                                     {runner.tx_signature ? (
-                                        <a 
+                                        <a
                                             href={`https://explorer.solana.com/tx/${runner.tx_signature}?cluster=devnet`}
                                             target="_blank"
                                             rel="noreferrer"

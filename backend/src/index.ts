@@ -7,13 +7,16 @@
  */
 import 'dotenv/config';
 import express from 'express';
+import cors from 'cors';
 import { startMqttListener } from './mqtt/listener';
 import { startRefundScheduler, stopRefundScheduler, manualTriggerRefunds } from './scheduler/refund-scheduler';
 import { initBlockchainClient, logBlockchainStatus } from './blockchain/transaction-signer';
+import { deleteEventWithRefund } from './api/deleteEvent';
 
 const PORT = process.env.PORT || 3001;
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 // ============================================================================
@@ -73,12 +76,58 @@ app.get('/admin/blockchain-status', (_req, res) => {
 });
 
 // ============================================================================
+// Event Management Endpoints
+// ============================================================================
+
+/**
+ * Delete a race event and refund all participants
+ * DELETE /api/events/:id
+ * 
+ * Response:
+ * {
+ *   status: 'ok' | 'error',
+ *   message: string,
+ *   details: {
+ *     eventId: string,
+ *     eventName: string,
+ *     participantsRefunded: number,
+ *     transactionSignature: string | null,
+ *     timestamp: string
+ *   }
+ * }
+ */
+app.delete('/api/events/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        if (!id) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Event ID is required',
+            });
+        }
+
+        console.log(`\n📌 Delete event endpoint called: ${id}`);
+        const result = await deleteEventWithRefund(id);
+        
+        const statusCode = result.status === 'ok' ? 200 : 400;
+        res.status(statusCode).json(result);
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            message: String(error),
+        });
+    }
+});
+
+// ============================================================================
 // Start Server
 // ============================================================================
 
 app.listen(PORT, async () => {
     console.log(`\n🚀 SolaRun Backend running on port ${PORT}`);
     console.log(`   Health: http://localhost:${PORT}/health`);
+    console.log(`   Delete Event: DELETE http://localhost:${PORT}/api/events/:id`);
     console.log(`   Blockchain Status: http://localhost:${PORT}/admin/blockchain-status`);
     console.log(`   Trigger Refunds: POST http://localhost:${PORT}/admin/trigger-refunds`);
     console.log('');

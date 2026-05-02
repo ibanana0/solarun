@@ -273,7 +273,98 @@ Expected result: event status changes to `settled` in Supabase.
 
 ---
 
+## API Endpoints (Backend)
+
+### Admin Endpoints
+
+#### Get Health Status
+```http
+GET /health
+```
+Response: `{ status: 'ok', service: 'solarun-backend', timestamp: '...' }`
+
+#### Get Blockchain Status
+```http
+GET /admin/blockchain-status
+```
+Response: Logs blockchain connection info and returns `{ status: 'ok' }`
+
+#### Manually Trigger Refunds
+```http
+POST /admin/trigger-refunds
+```
+Response: `{ status: 'ok', message: 'Refund processing triggered', timestamp: '...' }`
+
+### Event Management Endpoints
+
+#### Delete Event & Refund Participants
+```http
+DELETE /api/events/:id
+```
+
+**Description:** Deletes a race event and automatically refunds all registered participants.
+
+**Parameters:**
+- `id` (path) — UUID of the event to delete
+
+**Response (Success):**
+```json
+{
+  "status": "ok",
+  "message": "Event deleted successfully. 5 participant(s) refunded.",
+  "details": {
+    "eventId": "550e8400-e29b-41d4-a716-446655440000",
+    "eventName": "Marathon 2026",
+    "participantsRefunded": 5,
+    "transactionSignature": "5sQ4r8vZ9xA2jK1qL3mN4oP5rS6tU7vW8xY9zA0bC1dE2fG3hI4jK5lM6nO7pQ8r",
+    "timestamp": "2026-05-02T10:30:45.123Z"
+  }
+}
+```
+
+**Response (Error):**
+```json
+{
+  "status": "error",
+  "message": "Event not found: invalid-event-id",
+  "timestamp": "2026-05-02T10:30:45.123Z"
+}
+```
+
+**Workflow:**
+1. ✅ Verify event exists and is not already settled
+2. ✅ Fetch all registered participants
+3. ✅ Call smart contract `process_refunds()` to refund participants (if blockchain available)
+4. ✅ Delete all `race_logs` entries for the event's participants
+5. ✅ Delete all `runners` (participants) for the event
+6. ✅ Delete the `race_events` record itself
+
+**Restrictions:**
+- ❌ Cannot delete events with status `settled` (already processed)
+- ✅ Can delete events with status: `pending`, `active`, `completed`
+
+**Frontend Usage:**
+```typescript
+const handleDeleteEvent = async (eventId: string) => {
+  const response = await fetch(`/api/events/${eventId}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  const data = await response.json();
+  
+  if (response.ok) {
+    alert(`✅ Deleted! Refunded ${data.details.participantsRefunded} participants.`);
+    // Refresh event list
+  } else {
+    alert(`❌ Error: ${data.message}`);
+  }
+};
+```
+
+---
+
 ## MQTT Payload Format
+
 
 IoT sensors (ESP32) publish to topic `solarun/checkpoint` using this JSON format:
 
