@@ -29,9 +29,16 @@ const DEMO_CHIP_UIDS = [
     'CHIP_M3N4O5', 'CHIP_P6Q7R8', 'CHIP_S9T0U1', 'CHIP_V2W3X4',
 ];
 
+import { useProgram } from '@/hooks/useProgram';
+import * as anchor from '@coral-xyz/anchor';
+import { PublicKey } from '@solana/web3.js';
+import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { v4 as uuidv4 } from 'uuid';
+
 export default function RegisterPage() {
     const { ready, authenticated, walletAddress, login } = useAuth();
     const { data: events, isLoading: eventsLoading } = useEvents();
+    const program = useProgram();
 
     const [fullName, setFullName] = useState('');
     const [chipUid, setChipUid] = useState('');
@@ -59,32 +66,84 @@ export default function RegisterPage() {
         if (!fullName.trim()) { setError('Nama lengkap harus diisi.'); return; }
         if (!chipUid) { setError('Pilih Chip UID.'); return; }
         if (!eventId) { setError('Pilih event terlebih dahulu.'); return; }
-        if (!walletAddress) { setError('Wallet belum tersedia. Coba login ulang.'); return; }
+        if (!walletAddress || !program) { setError('Wallet/Program belum tersedia. Coba login ulang.'); return; }
 
-        // Mock transaction signature for Phase 2.3
-        const mockTxSignature = `3${Array.from({length: 87}, () => "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"[Math.floor(Math.random() * 58)]).join('')}`;
+        const runnerUuid = uuidv4();
+        const selectedEvent = activeEvents.find(e => e.id === eventId);
+        if (!selectedEvent) { setError('Event tidak ditemukan.'); return; }
 
         setSubmitting(true);
         try {
+            // 1. Prepare On-Chain Instruction
+            const programId = program.programId;
+            const runner = new PublicKey(walletAddress);
+
+            // Derive PDAs
+            const [participantPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from('participant'), Buffer.from(eventId), Buffer.from(runnerUuid)],
+                programId
+            );
+            const [eventPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from('event'), Buffer.from(eventId)],
+                programId
+            );
+            const [vaultPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from('vault'), Buffer.from(eventId)],
+                programId
+            );
+            const [mockUsdcMint] = PublicKey.findProgramAddressSync(
+                [Buffer.from('mock_usdc_mint')],
+                programId
+            );
+
+            // Derive User ATA
+            const userAta = await getAssociatedTokenAddress(mockUsdcMint, runner);
+
+            // 2. Execute On-Chain Transaction
+            const txSignature = await program.methods
+                .registerParticipant(
+                    eventId,
+                    chipUid,
+                    runner,
+                    fullName.trim(),
+                    runnerUuid
+                )
+                .accounts({
+                    runner,
+                    participant: participantPda,
+                    event: eventPda,
+                    vault: vaultPda,
+                    runnerTokenAccount: userAta, // Corrected key name from IDL
+                    systemProgram: anchor.web3.SystemProgram.programId,
+                    tokenProgram: TOKEN_PROGRAM_ID,
+                } as any)
+                .rpc();
+
+            console.log("On-chain registration successful:", txSignature);
+
+            // 3. Sync to Off-Chain (Supabase)
             const { error: insertError } = await supabase.from('runners').insert({
+                id: runnerUuid,
                 full_name: fullName.trim(),
                 chip_uid: chipUid,
                 event_id: eventId,
                 wallet_address: walletAddress,
                 status: 'registered',
                 finish_position: null,
-                tx_signature: mockTxSignature,
+                tx_signature: txSignature,
             });
+
             if (insertError) {
                 setError(insertError.code === '23505'
                     ? 'Chip UID ini sudah digunakan. Pilih chip lain.'
-                    : `Gagal mendaftar: ${insertError.message}`
+                    : `Berhasil di blockchain, tapi gagal simpan ke DB: ${insertError.message}`
                 );
                 return;
             }
-            setSuccess({ eventId, txSignature: mockTxSignature });
-        } catch {
-            setError('Terjadi kesalahan. Coba lagi.');
+            setSuccess({ eventId, txSignature: txSignature });
+        } catch (err: any) {
+            console.error("Failed to register:", err);
+            setError(`Terjadi kesalahan: ${err.message || 'Coba lagi.'}`);
         } finally {
             setSubmitting(false);
         }
@@ -209,7 +268,7 @@ export default function RegisterPage() {
                                     <SelectContent>
                                         {activeEvents.map((event) => (
                                             <SelectItem key={event.id} value={event.id}>
-                                                {event.name} ({event.registration_fee_sol} SOL)
+                                                {event.name} ({event.registration_fee_sol} USDC)
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

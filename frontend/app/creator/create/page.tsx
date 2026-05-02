@@ -17,12 +17,19 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 
+import { useProgram } from '@/hooks/useProgram';
+import * as anchor from '@coral-xyz/anchor';
+import { PublicKey } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { v4 as uuidv4 } from 'uuid';
+
 export default function CreateEventPage() {
     const { ready, authenticated, login, isCreator, walletAddress, loading: authLoading } = useAuth();
+    const program = useProgram();
 
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
-    const [feeSol, setFeeSol] = useState('0.1');
+    const [feeUsdc, setFeeUsdc] = useState('10'); // Changed from feeSol
     const [maxParticipants, setMaxParticipants] = useState('100');
     const [startDate, setStartDate] = useState('');
     const [startTime, setStartTime] = useState('');
@@ -39,9 +46,9 @@ export default function CreateEventPage() {
         // Validation
         if (!name.trim()) { setError('Nama event harus diisi.'); return; }
         if (!startDate || !startTime) { setError('Tanggal dan jam mulai harus diisi.'); return; }
-        if (!walletAddress) { setError('Wallet belum tersedia. Coba login ulang.'); return; }
+        if (!walletAddress || !program) { setError('Wallet/Program belum tersedia. Coba login ulang.'); return; }
 
-        const fee = parseFloat(feeSol);
+        const fee = parseFloat(feeUsdc);
         if (isNaN(fee) || fee <= 0) { setError('Biaya registrasi harus lebih dari 0.'); return; }
 
         const max = parseInt(maxParticipants);
@@ -56,35 +63,77 @@ export default function CreateEventPage() {
 
         const endDateTime = new Date(startDateTime.getTime() + duration * 60 * 60 * 1000);
         
-        // Mock transaction signature for Phase 2.3
-        const mockTxSignature = `3${Array.from({length: 87}, () => "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"[Math.floor(Math.random() * 58)]).join('')}`;
+        const eventUuid = uuidv4();
 
         setSubmitting(true);
         try {
+            // 1. Prepare On-Chain Instruction
+            const programId = program.programId;
+            const admin = new PublicKey(walletAddress);
+
+            // Derive PDAs
+            const [eventPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from('event'), Buffer.from(eventUuid)],
+                programId
+            );
+            const [vaultPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from('vault'), Buffer.from(eventUuid)],
+                programId
+            );
+            const [mockUsdcMint] = PublicKey.findProgramAddressSync(
+                [Buffer.from('mock_usdc_mint')],
+                programId
+            );
+
+            // 2. Execute On-Chain Transaction
+            const txSignature = await program.methods
+                .initializeEvent(
+                    eventUuid,
+                    new anchor.BN(max),
+                    new anchor.BN(fee * 1_000_000), // 6 decimals
+                    new anchor.BN(Math.floor(startDateTime.getTime() / 1000)),
+                    new anchor.BN(Math.floor(endDateTime.getTime() / 1000))
+                )
+                .accounts({
+                    admin,
+                    event: eventPda,
+                    vault: vaultPda,
+                    mockUsdcMint,
+                    systemProgram: anchor.web3.SystemProgram.programId,
+                    tokenProgram: TOKEN_PROGRAM_ID,
+                } as any)
+                .rpc();
+
+            console.log("On-chain event initialized:", txSignature);
+
+            // 3. Sync to Off-Chain (Supabase)
             const { data, error: insertError } = await supabase
                 .from('race_events')
                 .insert({
+                    id: eventUuid,
                     name: name.trim(),
                     description: description.trim() || null,
-                    registration_fee_sol: fee,
+                    registration_fee_sol: fee, // Storing as 'fee' in this field for now (refactoring column name later)
                     max_participants: max,
                     status: 'pending',
                     start_time: startDateTime.toISOString(),
                     end_time: endDateTime.toISOString(),
                     creator_wallet: walletAddress,
-                    tx_signature: mockTxSignature,
+                    tx_signature: txSignature,
+                    vault_address: vaultPda.toBase58(),
                 })
                 .select('id, name, tx_signature')
                 .single();
 
             if (insertError) {
-                setError(`Gagal membuat event: ${insertError.message}`);
+                setError(`Berhasil di blockchain, tapi gagal simpan ke DB: ${insertError.message}`);
                 return;
             }
 
             setCreatedEvent(data);
-        } catch {
-            setError('Terjadi kesalahan. Coba lagi.');
+        } catch (err: any) {
+            console.error("Failed to create event:", err);
+            setError(`Terjadi kesalahan: ${err.message || 'Coba lagi.'}`);
         } finally {
             setSubmitting(false);
         }
@@ -236,15 +285,15 @@ export default function CreateEventPage() {
                         {/* Fee + Max participants */}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="fee">Biaya Registrasi (SOL)</Label>
+                                <Label htmlFor="fee">Biaya Registrasi (USDC)</Label>
                                 <Input
                                     id="fee"
                                     type="number"
                                     step="0.01"
                                     min="0.01"
-                                    placeholder="0.1"
-                                    value={feeSol}
-                                    onChange={(e) => { setFeeSol(e.target.value); setError(null); }}
+                                    placeholder="10"
+                                    value={feeUsdc}
+                                    onChange={(e) => { setFeeUsdc(e.target.value); setError(null); }}
                                     disabled={submitting}
                                 />
                             </div>

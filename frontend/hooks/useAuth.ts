@@ -19,6 +19,8 @@ export function useAuth() {
     const [solaRunUser, setSolaRunUser] = useState<SolaRunUser | null>(null);
     const [loading, setLoading] = useState(false);
 
+    const ADMIN_WALLET = 'A7PqEe2t83XkEmVT3ToaTr5pubUAKwMGyAZdg69gUsyv';
+
     // Get embedded wallet address from Privy user
     const walletAddress = user?.wallet?.address ?? null;
 
@@ -33,6 +35,7 @@ export function useAuth() {
             setLoading(true);
             try {
                 const privyId = user.id;
+                const isSystemAdmin = walletAddress === ADMIN_WALLET;
 
                 // Check if user exists
                 const { data: existing } = await supabase
@@ -42,23 +45,31 @@ export function useAuth() {
                     .single();
 
                 if (existing) {
-                    // Update wallet if changed
+                    // Update wallet if changed or role if admin
+                    const updates: any = {};
                     if (walletAddress && existing.wallet_address !== walletAddress) {
+                        updates.wallet_address = walletAddress;
+                    }
+                    if (isSystemAdmin && existing.role !== 'creator') {
+                        updates.role = 'creator';
+                    }
+
+                    if (Object.keys(updates).length > 0) {
                         await supabase
                             .from('users')
-                            .update({ wallet_address: walletAddress })
+                            .update(updates)
                             .eq('privy_id', privyId);
-                        existing.wallet_address = walletAddress;
+                        Object.assign(existing, updates);
                     }
                     setSolaRunUser(existing as SolaRunUser);
                 } else {
-                    // First login — create user with default role 'runner'
+                    // First login — create user
                     const { data: newUser, error } = await supabase
                         .from('users')
                         .insert({
                             privy_id: privyId,
                             wallet_address: walletAddress ?? '',
-                            role: 'runner',
+                            role: isSystemAdmin ? 'creator' : 'runner',
                         })
                         .select()
                         .single();

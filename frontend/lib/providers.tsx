@@ -1,6 +1,8 @@
 'use client';
 
 import { PrivyProvider } from '@privy-io/react-auth';
+import { toSolanaWalletConnectors } from '@privy-io/react-auth/solana';
+import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -28,6 +30,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
         );
     }
 
+    const solanaConnectors = toSolanaWalletConnectors({
+        shouldAutoConnect: true,
+    });
+
+    const devnetRpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
+
     return (
         <PrivyProvider
             appId={privyAppId}
@@ -37,12 +45,41 @@ export function Providers({ children }: { children: React.ReactNode }) {
                     accentColor: '#18181b',
                     walletChainType: 'solana-only',
                 },
+                solana: {
+                    rpcs: {
+                        // Official CAIP-2 ID for Mainnet (pointing to Devnet for local development to avoid 403)
+                        'solana:4uhcV1ymUcaLWU2hH9vB68R6F4U4LzSu': {
+                            rpc: createSolanaRpc(devnetRpcUrl),
+                            rpcSubscriptions: createSolanaRpcSubscriptions(devnetRpcUrl.replace('https', 'wss')),
+                        },
+                        // Fallback alias for Mainnet
+                        'solana:mainnet': {
+                            rpc: createSolanaRpc(devnetRpcUrl),
+                            rpcSubscriptions: createSolanaRpcSubscriptions(devnetRpcUrl.replace('https', 'wss')),
+                        },
+                        // Official CAIP-2 ID for Devnet
+                        'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp': {
+                            rpc: createSolanaRpc(devnetRpcUrl),
+                            rpcSubscriptions: createSolanaRpcSubscriptions(devnetRpcUrl.replace('https', 'wss')),
+                        },
+                        // Fallback alias for Devnet
+                        'solana:devnet': {
+                            rpc: createSolanaRpc(devnetRpcUrl),
+                            rpcSubscriptions: createSolanaRpcSubscriptions(devnetRpcUrl.replace('https', 'wss')),
+                        },
+                    },
+                },
                 embeddedWallets: {
                     solana: {
                         createOnLogin: 'all-users',
                     },
                 },
-                loginMethods: ['email', 'google'],
+                externalWallets: {
+                    solana: {
+                        connectors: solanaConnectors,
+                    },
+                },
+                loginMethods: ['email', 'google', 'wallet'],
             }}
         >
             <QueryClientProvider client={queryClient}>
