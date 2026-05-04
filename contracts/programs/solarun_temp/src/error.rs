@@ -31,7 +31,7 @@ pub enum ErrorCode {
     #[msg("E0014: Invalid chip UID (empty or too long, max 20 chars)")]
     InvalidChipUid,
 
-    #[msg("E0015: Maximum participants reached for this event")]
+    #[msg("Maximum participants reached")]
     MaxParticipantsReached,
 
     // E0020-E0029: Finish Recording
@@ -88,4 +88,13 @@ pub enum ErrorCode {
 
     #[msg("E0052: Invalid wallet address format")]
     InvalidWalletFormat,
+
+    #[msg("Event must be in Initialized status to register")]
+    EventNotInitialized,
+
+    #[msg("Event must be in Active status to record finish")]
+    EventNotActiveForFinish,
+
+    #[msg("Event must be in Completed status to process refunds")]
+    EventNotCompletedForRefund,
 }

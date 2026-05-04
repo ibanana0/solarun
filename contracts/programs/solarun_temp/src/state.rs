@@ -12,6 +12,7 @@ pub struct Event {
     pub mint: Pubkey,               // Mock USDC mint address
     pub status: EventStatus,        // Initialized, Active, Completed, Settled
     pub participant_count: u32,     // Total registered
+    pub max_participants: u32,      // NEW: Maximum participants allowed
     pub total_deposits: u64,        // Total USDC in vault (token units)
     pub registration_fee: u64,      // Fee per participant (token units)
     pub start_time: i64,            // Unix timestamp
