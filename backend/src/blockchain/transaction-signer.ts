@@ -16,11 +16,17 @@ import {
     Keypair,
     PublicKey,
     Transaction,
+    TransactionInstruction,
     sendAndConfirmTransaction,
     SystemProgram,
 } from '@solana/web3.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as anchor from "@coral-xyz/anchor";
+import { Program, type Idl } from "@coral-xyz/anchor";
+import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+
+import idl from "./solarun_temp.json" with { type: "json" };
 
 // ============================================================================
 // Configuration
@@ -90,7 +96,7 @@ function getConnection(): Connection {
 /**
  * Get the admin keypair
  */
-function getAdminKeypair(): Keypair {
+export function getAdminKeypair(): Keypair {
     if (!adminKeypair) {
         throw new Error('Admin keypair not initialized. Call initBlockchainClient() first.');
     }
@@ -108,46 +114,111 @@ function getAdminKeypair(): Keypair {
  * - Distributes prizes to top 4 finishers
  * - Distributes refunds to non-finishers
  * - Marks event as settled
- *
- * @param eventId - UUID of the event to process refunds for
- * @returns Instruction object (for now, placeholder)
- *
- * NOTE: Full implementation requires:
- * - IDL (Interface Definition Language) from smart contract
- * - Proper account setup (vault, event PDA, token accounts, etc.)
- * - This is a V1 skeleton; will be expanded when SC is ready
  */
 export interface ProcessRefundsParams {
     eventId: string;
     programId: string;
     vaultAddress: string;
     adminWallet: PublicKey;
+    recipientWallets: PublicKey[];
+    amounts: anchor.BN[];
+    nonFinishers: string[];
+    mint?: PublicKey; // Optional: will derive default if not provided
 }
 
 export async function buildProcessRefundsInstruction(
     params: ProcessRefundsParams
-): Promise<any> {
-    const { eventId, vaultAddress, adminWallet } = params;
+): Promise<anchor.web3.TransactionInstruction> {
+    const { eventId, vaultAddress, adminWallet, programId, recipientWallets, amounts, nonFinishers, mint } = params;
 
-    console.log(`📋 Building process_refunds instruction:`);
-    console.log(`   Event ID: ${eventId}`);
-    console.log(`   Vault: ${vaultAddress}`);
-    console.log(`   Admin: ${adminWallet.toBase58()}`);
+    // 1. Pembersihan UUID (Remove dashes)
+    const cleanEventId = eventId.replace(/-/g, '');
 
-    // TODO: Replace with actual instruction builder when IDL is available
-    // For now, this is a placeholder that logs the parameters
-    // The actual implementation will:
-    // 1. Parse event_id as UUID and derive event PDA
-    // 2. Get vault account (check balance, authority, etc.)
-    // 3. Build instruction data (instruction discriminator + event_id)
-    // 4. Return Instruction with proper accounts & signers
+    try {
+        console.log(`\n📋 Building processRefunds instruction...`);
+        console.log(`   Event ID: ${cleanEventId}`);
+        console.log(`   Program ID: ${programId}`);
+        console.log(`   Vault: ${vaultAddress}`);
+        console.log(`   Admin: ${adminWallet.toBase58()}`);
 
-    return {
-        eventId,
-        vaultAddress,
-        adminWallet: adminWallet.toBase58(),
-        // actual instruction details will be added here
-    };
+        const provider = new anchor.AnchorProvider(
+            getConnection(),
+            new anchor.Wallet(getAdminKeypair()),
+            { commitment: "confirmed" }
+        );
+
+        const program = new Program(
+            { ...idl, address: programId } as Idl, 
+            provider
+        );
+
+        // 2. Derivasi Event PDA menggunakan cleanEventId
+        const [eventPda] = PublicKey.findProgramAddressSync(
+            [Buffer.from("event"), Buffer.from(cleanEventId)],
+            program.programId
+        );
+        console.log(`   Event PDA: ${eventPda.toBase58()}`);
+
+        // 3. Tentukan Mint Address (Gunakan yang dioper atau derive default mock_usdc_mint)
+        let mintAddress: PublicKey;
+        if (mint) {
+            mintAddress = mint;
+        } else {
+            const [mintPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("mock_usdc_mint")],
+                program.programId
+            );
+            mintAddress = mintPda;
+        }
+        console.log(`   Mint: ${mintAddress.toBase58()}`);
+
+        // 4. Kalkulasi ATAs (Associated Token Accounts) untuk setiap penerima
+        // Akun-akun ini harus dikirim sebagai remainingAccounts agar transfer berhasil
+        console.log(`   🔍 Building recipient ATAs...`);
+        const remainingAccounts = await Promise.all(
+            recipientWallets.map(async (wallet, index) => {
+                const ata = await getAssociatedTokenAddress(mintAddress, wallet);
+                console.log(`      Recipient ${index + 1}/${recipientWallets.length}: ${wallet.toBase58()}`);
+                console.log(`         ATA: ${ata.toBase58()}`);
+                return {
+                    pubkey: ata,
+                    isWritable: true,
+                    isSigner: false,
+                };
+            })
+        );
+
+        console.log(`   ✓ Built ${remainingAccounts.length} recipient accounts`);
+
+        // 5. Gunakan MethodsBuilder dengan 5 argumen sesuai IDL
+        const instruction = await (program.methods as any)
+            .processRefunds(
+                cleanEventId,
+                [], // finishers: Vec<FinisherData>
+                nonFinishers, // non_finishers: Vec<string>
+                recipientWallets, // recipient_wallets: Vec<PublicKey>
+                amounts  // amounts: Vec<u64>
+            )
+            .accounts({
+                admin: adminWallet,
+                event: eventPda,
+                vault: new PublicKey(vaultAddress),
+                tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .remainingAccounts(remainingAccounts) // SANGAT PENTING: Mencegah Error 6020
+            .instruction();
+
+        console.log(`✅ Instruction built successfully`);
+        console.log(`   Size: ${instruction.data.length} bytes`);
+        return instruction;
+    } catch (error) {
+        console.error('❌ Error building processRefunds instruction:', error);
+        if (error instanceof Error) {
+            console.error(`   Message: ${error.message}`);
+            if ('stack' in error) console.error(`   Stack: ${error.stack}`);
+        }
+        throw error;
+    }
 }
 
 /**
@@ -169,12 +240,19 @@ export async function submitTransaction(
         // Get latest blockhash
         const { blockhash } = await conn.getLatestBlockhash('confirmed');
         transaction.recentBlockhash = blockhash;
+        transaction.feePayer = signers[0].publicKey;
 
         // Sign transaction
+        console.log(`   🔐 Signing with ${signers.length} signer(s)...`);
         transaction.sign(...signers);
 
+        // Serialize and validate
+        const serialized = transaction.serialize();
+        console.log(`   📦 Serialized transaction size: ${serialized.length} bytes`);
+
         // Submit
-        const signature = await conn.sendRawTransaction(transaction.serialize(), {
+        console.log(`   📡 Sending raw transaction to RPC...`);
+        const signature = await conn.sendRawTransaction(serialized, {
             skipPreflight: false,
             preflightCommitment: 'confirmed',
         });
@@ -182,17 +260,39 @@ export async function submitTransaction(
         console.log(`✅ Transaction submitted: ${signature}`);
 
         // Wait for confirmation (30 second timeout)
+        console.log(`   ⏳ Waiting for confirmation...`);
         const confirmation = await conn.confirmTransaction(signature, 'confirmed');
 
         if (confirmation.value.err) {
-            console.error(`❌ Transaction failed:`, confirmation.value.err);
+            console.error(`❌ Transaction failed on-chain:`, confirmation.value.err);
             throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
         }
 
         console.log(`✅ Transaction confirmed!`);
+        console.log(`   Slot: ${confirmation.context.slot}`);
+        
+        // Optional: Fetch transaction for additional details
+        try {
+            const txInfo = await conn.getTransaction(signature, { commitment: 'confirmed' });
+            if (txInfo?.meta?.err) {
+                console.error(`❌ Transaction execution error:`, txInfo.meta.err);
+                throw new Error(`Transaction execution failed: ${JSON.stringify(txInfo.meta.err)}`);
+            }
+            if (txInfo?.meta?.computeUnitsConsumed) {
+                console.log(`   Compute units: ${txInfo.meta.computeUnitsConsumed}`);
+            }
+        } catch (fetchErr) {
+            // Not critical if we can't fetch details
+            console.warn(`   ⚠️  Could not fetch transaction details:`, fetchErr);
+        }
+        
         return signature;
     } catch (error) {
         console.error(`❌ Failed to submit transaction:`, error);
+        if (error instanceof Error) {
+            console.error(`   Error message: ${error.message}`);
+            console.error(`   Error stack: ${error.stack}`);
+        }
         throw error;
     }
 }
@@ -209,6 +309,76 @@ export async function checkConnection(): Promise<boolean> {
     } catch (error) {
         console.error(`❌ Solana RPC unreachable:`, error);
         return false;
+    }
+}
+
+// ============================================================================
+// Delete Event Instruction Builder
+// ============================================================================
+
+/**
+ * Build instruction for delete_event
+ *
+ * This instruction:
+ * - Transfers remaining USDC from vault to admin's token account
+ * - Closes the vault token account (rent → admin)
+ * - Closes the event PDA (rent → admin, via `close = admin`)
+ */
+export interface DeleteEventParams {
+    eventId: string;
+    programId: string;
+    vaultAddress: string;
+    adminWallet: PublicKey;
+    adminTokenAccount: PublicKey;
+}
+
+export async function buildDeleteEventInstruction(
+    params: DeleteEventParams
+): Promise<anchor.web3.TransactionInstruction> {
+    const { eventId, vaultAddress, adminWallet, programId, adminTokenAccount } = params;
+
+    const cleanEventId = eventId.replace(/-/g, '');
+
+    try {
+        console.log(`\n📋 Building deleteEvent instruction...`);
+        console.log(`   Event ID: ${cleanEventId}`);
+        console.log(`   Admin: ${adminWallet.toBase58()}`);
+        console.log(`   Admin Token Account: ${adminTokenAccount.toBase58()}`);
+
+        const provider = new anchor.AnchorProvider(
+            getConnection(),
+            new anchor.Wallet(getAdminKeypair()),
+            { commitment: "confirmed" }
+        );
+
+        const program = new Program(
+            { ...idl, address: programId } as Idl,
+            provider
+        );
+
+        const [eventPda] = PublicKey.findProgramAddressSync(
+            [Buffer.from("event"), Buffer.from(cleanEventId)],
+            program.programId
+        );
+        console.log(`   Event PDA: ${eventPda.toBase58()}`);
+
+        const instruction = await (program.methods as any)
+            .deleteEvent(cleanEventId)
+            .accounts({
+                admin: adminWallet,
+                event: eventPda,
+                vault: new PublicKey(vaultAddress),
+                adminTokenAccount: adminTokenAccount,
+                tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .instruction();
+
+        console.log(`✅ deleteEvent instruction built successfully`);
+        console.log(`   Size: ${instruction.data.length} bytes`);
+        return instruction;
+    } catch (error) {
+        console.error('❌ Error building deleteEvent instruction:', error);
+        throw error;
     }
 }
 

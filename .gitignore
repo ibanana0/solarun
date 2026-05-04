@@ -6,3 +6,5 @@ node_modules/
 ARCHITECTURE.md
 gemini*
 .gemini
+BUG_REPORT_DELETE_EVENT.md
+admin-keypair.json

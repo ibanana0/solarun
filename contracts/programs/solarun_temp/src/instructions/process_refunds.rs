@@ -48,19 +48,20 @@ pub fn handler<'info>(
     let event_bump = ctx.accounts.event.bump;
     let vault_balance = ctx.accounts.vault.amount;
 
-    if event_id_str != event_id {
-        return Err(ErrorCode::RefundEventNotFound.into());
-    }
+    require!(event_id_str == event_id, ErrorCode::RefundEventNotFound);
 
-    let total_to_distribute: u64 = amounts.iter().sum();
-    if total_to_distribute > vault_balance {
-        return Err(ErrorCode::ArithmeticOverflow.into());
-    }
+    // 1. Validasi total yang akan didistribusikan vs saldo vault
+    // Menggunakan checked_add untuk mencegah overflow saat penjumlahan di Rust
+    let total_to_distribute: u64 = amounts.iter().try_fold(0u64, |acc, &x| acc.checked_add(x))
+        .ok_or(ErrorCode::ArithmeticOverflow)?;
 
+    // Gunakan ErrorCode::VaultEmpty jika saldo tidak mencukupi (Lebih informatif daripada ArithmeticOverflow)
+    require!(vault_balance >= total_to_distribute, ErrorCode::VaultEmpty);
+
+    // 2. Validasi jumlah akun (remaining_accounts) harus sama dengan jumlah entry di amounts
+    // Ini adalah penyebab utama error 6020 (ArithmeticOverflow di kode lama) jika .remainingAccounts() lupa dipanggil
     let remaining_accounts = ctx.remaining_accounts;
-    if remaining_accounts.len() != amounts.len() {
-        return Err(ErrorCode::ArithmeticOverflow.into());
-    }
+    require!(remaining_accounts.len() == amounts.len(), ErrorCode::InvalidFinisherPosition);
 
     // Event PDA is the vault token authority; sign with event seeds
     let signer_seeds: &[&[u8]] = &[b"event", event_id.as_bytes(), &[event_bump]];
@@ -70,6 +71,7 @@ pub fn handler<'info>(
     let vault_info = ctx.accounts.vault.to_account_info();
     let token_program_key = ctx.accounts.token_program.key();
 
+    // 3. Eksekusi transfer ke masing-masing penerima (ATA)
     for (i, recipient_ata) in remaining_accounts.iter().enumerate() {
         let amount = amounts[i];
         if amount > 0 {
@@ -98,7 +100,7 @@ pub fn handler<'info>(
         non_finisher_count: 0,
     });
 
-    msg!("Refunds processed for event: {}", event_id);
+    msg!("Refunds processed successfully for event: {}", event_id);
     Ok(())
 }
 

@@ -110,7 +110,9 @@ export function useAnchorProvider() {
 
         const connection = new Connection(RPC_URL, 'confirmed');
         return new AnchorProvider(connection, anchorWallet, {
+            preflightCommitment: 'confirmed',
             commitment: 'confirmed',
+            skipPreflight: true,
         });
     }, [anchorWallet]);
 
