@@ -80,6 +80,29 @@ export async function validateCheckpoint(msg: CheckpointMessage): Promise<Valida
         return { valid: false, error: `Runner not found for chip_uid: ${rfid_uid}` };
     }
 
+    // --- Check Event Cut-off Logic ---
+    const { data: event, error: eventError } = await supabase
+        .from('race_events')
+        .select('status, actual_start_time, duration_hours')
+        .eq('id', runner.event_id)
+        .maybeSingle();
+
+    if (eventError || !event) {
+        return { valid: false, error: `Failed to query event for runner` };
+    }
+
+    if (event.status !== 'active') {
+        return { valid: false, error: `Event is not active (current status: ${event.status})` };
+    }
+
+    if (event.actual_start_time && event.duration_hours) {
+        const cutoffTime = new Date(event.actual_start_time).getTime() + (event.duration_hours * 60 * 60 * 1000);
+        if (Date.now() > cutoffTime) {
+            console.log(`[Validator] Cutoff reached for event ${runner.event_id}. Tap rejected.`);
+            return { valid: false, error: "Race duration has ended" };
+        }
+    }
+
     // --- Check runner is not already finished or disqualified ---
     if (runner.status === 'finished') {
         return { valid: false, error: `Runner ${rfid_uid} has already finished` };
@@ -218,6 +241,16 @@ async function recordCheckpoint(
     }
 
     if (isFinish) {
+        // Optimistic UI: Mark as finishing while we process
+        const now = new Date().toISOString();
+        await supabase
+            .from('runners')
+            .update({ 
+                status: 'Finishing...',
+                processing_started_at: now
+            })
+            .eq('id', runnerId);
+
         // Auto-assign finish_position based on how many have already finished in this event
         const { count, error: countError } = await supabase
             .from('runners')
@@ -237,6 +270,7 @@ async function recordCheckpoint(
             .update({
                 status: 'finished',
                 finish_position: finishPosition,
+                processing_started_at: null, // Clear the processing timestamp
             })
             .eq('id', runnerId);
 
