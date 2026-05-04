@@ -61,6 +61,11 @@ export default function CreateEventPage() {
         const startDateTime = new Date(`${startDate}T${startTime}`);
         if (isNaN(startDateTime.getTime())) { setError('Format tanggal/jam tidak valid.'); return; }
 
+        if (startDateTime.getTime() < Date.now()) {
+            setError('Invalid start time.');
+            return;
+        }
+
         const endDateTime = new Date(startDateTime.getTime() + duration * 60 * 60 * 1000);
 
         const rawUuid = uuidv4();
@@ -121,7 +126,7 @@ export default function CreateEventPage() {
                     max_participants: max,
                     status: 'pending',
                     start_time: startDateTime.toISOString(),
-                    end_time: endDateTime.toISOString(),
+                    duration_hours: duration,
                     creator_wallet: walletAddress,
                     tx_signature: txSignature,
                     vault_address: vaultPda.toBase58(),
@@ -266,7 +271,7 @@ export default function CreateEventPage() {
                             <Label htmlFor="name">Nama Event *</Label>
                             <Input
                                 id="name"
-                                placeholder="Contoh: SolaRun Marathon Jakarta 2026"
+                                placeholder="Nama Event"
                                 value={name}
                                 onChange={(e) => { setName(e.target.value); setError(null); }}
                                 disabled={submitting}
@@ -322,6 +327,7 @@ export default function CreateEventPage() {
                                 <Input
                                     id="start_date"
                                     type="date"
+                                    min={new Date().toISOString().split('T')[0]}
                                     value={startDate}
                                     onChange={(e) => { setStartDate(e.target.value); setError(null); }}
                                     disabled={submitting}
