@@ -10,9 +10,9 @@ export interface RaceEvent {
     id: string;
     name: string;
     description: string;
-    status: 'pending' | 'active' | 'completed' | 'settled';
+    status: 'pending' | 'active' | 'completed' | 'settled' | 'Initialized' | 'Active' | 'Completed' | 'Settled';
     start_time: string;
-    end_time: string;
+    duration_hours: number;
     registration_fee_sol: number;
     max_participants: number;
     vault_address: string | null;
