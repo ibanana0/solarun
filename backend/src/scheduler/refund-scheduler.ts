@@ -13,19 +13,26 @@ import 'dotenv/config';
 import * as cron from 'node-cron';
 import { supabase } from '../lib/supabase';
 import {
-    buildProcessRefundsInstruction,
+    buildProcessRefundsInstructions,
     submitTransaction,
     checkConnection,
     logBlockchainStatus,
+    getConnection,
+    getAdminKeypair,
+    getEventAccount,
 } from '../blockchain/transaction-signer';
-import { Transaction, Keypair } from '@solana/web3.js';
+import { Transaction, Keypair, PublicKey } from '@solana/web3.js';
+import { BN } from '@coral-xyz/anchor';
+import { calculatePrizePool } from '../lib/prize-calculator';
+import { cleanupStuckTransactions } from '../workers/optimistic-cleanup';
 
 // ============================================================================
 // Configuration
 // ============================================================================
 
 const REFUND_SCHEDULER_INTERVAL = process.env.REFUND_SCHEDULER_INTERVAL || '*/1 * * * *'; // Every 1 minute
-const ADMIN_KEYPAIR_PATH = process.env.ADMIN_KEYPAIR_PATH;
+const BATCH_SIZE_WINNERS = 4;
+const BATCH_SIZE_NON_FINISHERS = 10;
 
 // Track processed events (in-memory, to avoid re-processing same event)
 const processedEvents = new Set<string>();
@@ -33,6 +40,32 @@ const processedEvents = new Set<string>();
 /** Reset for test isolation */
 export function resetProcessedEvents() {
     processedEvents.clear();
+}
+
+/**
+ * Check if a runner has already been paid/processed for an event
+ * @param runnerId - Runner ID
+ * @returns true if confirmed on-chain
+ */
+async function isRunnerPaid(runnerId: string): Promise<boolean> {
+    const { data } = await supabase
+        .from('runners')
+        .select('tx_signature')
+        .eq('id', runnerId)
+        .single();
+    
+    if (data?.tx_signature) {
+        try {
+            const conn = getConnection();
+            const status = await conn.getSignatureStatus(data.tx_signature);
+            // If signature exists and is finalized, they are paid
+            return status.value?.confirmationStatus === 'finalized';
+        } catch (e) {
+            console.warn(`      ⚠️  Failed to check signature status for ${runnerId}:`, e);
+            return false;
+        }
+    }
+    return false;
 }
 
 // ============================================================================
@@ -54,13 +87,12 @@ export async function processCompletedEvents() {
             return;
         }
 
-        // 1. Query for completed events (status = "active" AND end_time <= now)
-        const now = new Date();
+        // 1. Query for completed events (status = "completed")
+        // Manual finalize button sets status to 'completed'
         const { data: completedEvents, error: queryError } = await supabase
             .from('race_events')
             .select('*')
-            .eq('status', 'active')
-            .lte('end_time', now.toISOString());
+            .eq('status', 'completed');
 
         if (queryError) {
             console.error(`❌ Failed to query completed events:`, queryError);
@@ -89,6 +121,8 @@ export async function processCompletedEvents() {
  */
 async function processEventRefund(event: any) {
     const eventId = event.id;
+    const programId = process.env.SOLARUN_PROGRAM_ID!;
+    const vaultAddress = event.vault_address || process.env.VAULT_ADDRESS;
 
     try {
         console.log(`\n   🔄 Processing refunds for event: ${eventId}`);
@@ -100,7 +134,7 @@ async function processEventRefund(event: any) {
         }
 
         // 1. Get all runners for this event
-        const { data: runners, error: runnersError } = await supabase
+        const { data: allRunners, error: runnersError } = await supabase
             .from('runners')
             .select('*')
             .eq('event_id', eventId);
@@ -110,104 +144,176 @@ async function processEventRefund(event: any) {
             return;
         }
 
-        const totalRunners = runners?.length || 0;
-        const finishers = runners?.filter((r: any) => r.finish_position !== null) || [];
-        const nonFinishers = totalRunners - finishers.length;
+        if (!allRunners || allRunners.length === 0) {
+            console.log(`   ✓ No runners found for this event`);
+            // Still mark as settled? Maybe not.
+            return;
+        }
 
-        console.log(`   📊 Event stats:`);
-        console.log(`      Total runners: ${totalRunners}`);
-        console.log(`      Finishers: ${finishers.length}`);
-        console.log(`      Non-finishers: ${nonFinishers}`);
+        // 2. Filter out already processed runners (idempotency)
+        console.log(`   🔍 Checking idempotency for ${allRunners.length} runners...`);
+        const runnersToProcess = [];
+        for (const runner of allRunners) {
+            const paid = await isRunnerPaid(runner.id);
+            if (!paid) {
+                runnersToProcess.push(runner);
+            }
+        }
 
-        // 2. Build smart contract transaction
-        const instruction = await buildProcessRefundsInstruction({
-            eventId: eventId,
-            programId: process.env.SOLARUN_PROGRAM_ID!,
-            vaultAddress: event.vault_address || process.env.VAULT_ADDRESS!,
-            adminWallet: Keypair.generate().publicKey, // Will be replaced with actual admin
+        if (runnersToProcess.length === 0) {
+            console.log(`   ✓ All runners already processed`);
+            // Mark event as settled if it wasn't already
+            await markEventSettled(eventId);
+            processedEvents.add(eventId);
+            return;
+        }
+
+        console.log(`   📊 Found ${runnersToProcess.length} runners to process`);
+
+        // 3. Prize Calculation
+        // Fetch event data from on-chain to get the total deposits (original pool size)
+        // This ensures idempotency: even if some prizes are already paid, 
+        // the pool size remains the same for calculation.
+        console.log(`   🔍 Fetching on-chain event account for total deposits...`);
+        const eventAccount = await getEventAccount(eventId);
+        const totalVault = new BN(eventAccount.totalDeposits.toString());
+        console.log(`   💰 Initial prize pool (total deposits): ${totalVault.toString()} (raw units)`);
+
+        // Identify top 4 finishers (among ALL runners, not just unpaid ones)
+        const finishers = allRunners
+            .filter((r: any) => r.finish_position !== null)
+            .sort((a: any, b: any) => a.finish_position - b.finish_position);
+        
+        const top4Finishers = finishers.slice(0, 4);
+        const prizeShares = calculatePrizePool(totalVault, top4Finishers.map((f: any) => f.wallet_address));
+        
+        console.log(`   🏆 Prize distribution:`);
+        prizeShares.forEach((share, i) => {
+            console.log(`      ${i+1}. ${share.wallet}: ${share.amount.toString()} (raw)`);
         });
 
-        console.log(`   📋 Instruction built successfully`);
+        // 4. Batching Logic
+        // Winners are top 4 who are NOT YET PAID
+        const unpaidWinners = runnersToProcess.filter(r => r.finish_position !== null && r.finish_position <= 4);
+        // Non-finishers are those who didn't finish OR finished 5+
+        const nonWinnersToProcess = runnersToProcess.filter(r => r.finish_position === null || r.finish_position > 4);
 
-        // 3. Simulate transaction (placeholder)
-        // In production, this would:
-        // - Build actual Instruction object
-        // - Create Transaction with instruction
-        // - Sign with admin keypair
-        // - Submit to RPC
-        // - Wait for confirmation
+        console.log(`   📦 Batching: ${unpaidWinners.length} winners, ${nonWinnersToProcess.length} non-winners`);
 
-        const txSignature = await simulateRefundTransaction(eventId);
+        // We'll put all winners in the first batch if they fit
+        // And distribute non-finishers across batches
+        let currentNonWinnerIdx = 0;
+        let batchCount = 0;
 
-        if (!txSignature) {
-            console.error(`   ❌ Failed to submit refund transaction`);
-            return;
+        while (currentNonWinnerIdx < nonWinnersToProcess.length || batchCount === 0) {
+            batchCount++;
+            const isFirstBatch = batchCount === 1;
+            const batchWinners = isFirstBatch ? unpaidWinners : [];
+            const batchNonWinners = nonWinnersToProcess.slice(currentNonWinnerIdx, currentNonWinnerIdx + BATCH_SIZE_NON_FINISHERS);
+            currentNonWinnerIdx += BATCH_SIZE_NON_FINISHERS;
+            
+            const isFinalBatch = currentNonWinnerIdx >= nonWinnersToProcess.length;
+
+            console.log(`   🚀 Processing batch ${batchCount} (Final: ${isFinalBatch})`);
+            
+            const recipientWallets: PublicKey[] = [];
+            const amounts: BN[] = [];
+            const nonFinishersChipUids: string[] = [];
+            const runnerIdsInBatch: string[] = [];
+
+            // Add winners to this batch
+            for (const winner of batchWinners) {
+                const prize = prizeShares.find(p => p.wallet === winner.wallet_address);
+                if (prize) {
+                    recipientWallets.push(new PublicKey(winner.wallet_address));
+                    amounts.push(prize.amount);
+                    runnerIdsInBatch.push(winner.id);
+                }
+            }
+
+            // Add non-winners to this batch (they get 0 prize but update status in SC)
+            for (const runner of batchNonWinners) {
+                nonFinishersChipUids.push(runner.chip_uid);
+                runnerIdsInBatch.push(runner.id);
+            }
+
+            if (recipientWallets.length === 0 && nonFinishersChipUids.length === 0) {
+                if (isFinalBatch) {
+                     await markEventSettled(eventId);
+                }
+                break;
+            }
+
+            // Build and submit transaction
+            const instructions = await buildProcessRefundsInstructions({
+                eventId: eventId,
+                programId: programId,
+                vaultAddress: vaultAddress,
+                adminWallet: getAdminKeypair().publicKey,
+                recipientWallets,
+                amounts,
+                nonFinishers: nonFinishersChipUids,
+                isFinalBatch
+            });
+
+            const transaction = new Transaction().add(...instructions);
+            const txSignature = await submitTransaction(transaction, [getAdminKeypair()]);
+
+            console.log(`   ✅ Batch ${batchCount} confirmed: ${txSignature}`);
+
+            // Update Supabase with tx signature for audit and idempotency
+            await updateRunnersTxSignature(runnerIdsInBatch, txSignature);
+            
+            // Log for audit
+            await logRefundTransaction(eventId, txSignature, batchWinners.length, batchNonWinners.length);
+
+            if (isFinalBatch) {
+                await markEventSettled(eventId);
+                processedEvents.add(eventId);
+                console.log(`   ✅ Event ${eventId} fully settled!`);
+            }
         }
 
-        // 4. Update event status to "settled"
-        const { error: updateError } = await supabase
-            .from('race_events')
-            .update({
-                status: 'settled',
-                updated_at: new Date().toISOString(),
-            })
-            .eq('id', eventId);
-
-        if (updateError) {
-            console.error(`   ❌ Failed to update event status:`, updateError);
-            return;
-        }
-
-        // 5. Log transaction for audit
-        await logRefundTransaction(eventId, txSignature, finishers.length, nonFinishers);
-
-        // Mark as processed
-        processedEvents.add(eventId);
-
-        console.log(`   ✅ Refund processing complete!`);
-        console.log(`      TX Signature: ${txSignature}`);
     } catch (error) {
         console.error(`   ❌ Error processing event refund:`, error);
     }
 }
 
 /**
- * Simulate refund transaction (placeholder)
- * In production, this will actually call the smart contract
- *
- * @param eventId - Event ID to process
- * @returns Transaction signature (or null if failed)
+ * Update event status to "settled" in Supabase
  */
-async function simulateRefundTransaction(eventId: string): Promise<string | null> {
-    try {
-        console.log(`      💾 Simulating smart contract call...`);
+async function markEventSettled(eventId: string) {
+    const { error } = await supabase
+        .from('race_events')
+        .update({
+            status: 'settled',
+            updated_at: new Date().toISOString(),
+        })
+        .eq('id', eventId);
 
-        // TODO: Replace with actual smart contract call
-        // This is where we would:
-        // 1. Load admin keypair
-        // 2. Build instruction for process_refunds(event_id)
-        // 3. Create transaction
-        // 4. Sign with admin keypair
-        // 5. Submit to Solana devnet RPC
-        // 6. Wait for confirmation
+    if (error) {
+        console.error(`   ❌ Failed to update event status to settled:`, error);
+    } else {
+        console.log(`   ✓ Event status updated to settled`);
+    }
+}
 
-        // For now, generate a fake signature (64 chars base58)
-        const fakeTxSignature = generateFakeSignature();
+/**
+ * Update multiple runners with their transaction signature
+ */
+async function updateRunnersTxSignature(runnerIds: string[], txSignature: string) {
+    const { error } = await supabase
+        .from('runners')
+        .update({ tx_signature: txSignature })
+        .in('id', runnerIds);
 
-        console.log(`      ✓ Smart contract call simulated`);
-        return fakeTxSignature;
-    } catch (error) {
-        console.error(`      ❌ Failed to simulate transaction:`, error);
-        return null;
+    if (error) {
+        console.error(`   ❌ Failed to update runners with tx signature:`, error);
     }
 }
 
 /**
  * Log refund transaction details for audit trail
- * @param eventId - Event ID
- * @param txSignature - Transaction signature on Solana
- * @param finishers - Number of finishers
- * @param nonFinishers - Number of non-finishers
  */
 async function logRefundTransaction(
     eventId: string,
@@ -217,20 +323,13 @@ async function logRefundTransaction(
 ) {
     try {
         const timestamp = new Date().toISOString();
-        console.log(`   📝 Refund audit log:`);
-        console.log(`      Event: ${eventId}`);
-        console.log(`      TX: ${txSignature}`);
-        console.log(`      Finishers paid: ${finishers}`);
-        console.log(`      Refunds issued: ${nonFinishers}`);
-        console.log(`      Time: ${timestamp}`);
-
         // Store in refund_logs table as audit trail
         await supabase.from('refund_logs').insert({
             event_id: eventId,
             tx_signature: txSignature,
             finishers_paid: finishers,
             non_finishers_refunded: nonFinishers,
-            status: 'pending',
+            status: 'confirmed',
             created_at: timestamp,
         });
     } catch (error) {
@@ -254,9 +353,15 @@ export function startRefundScheduler() {
         console.log(`   Interval: ${REFUND_SCHEDULER_INTERVAL}`);
         console.log(`   (every 1 minute, or per REFUND_SCHEDULER_INTERVAL env)`);
 
-        // Schedule cron job
+        // Schedule cron job for refunds
         schedulerJob = cron.schedule(REFUND_SCHEDULER_INTERVAL, () => {
             processCompletedEvents();
+        });
+
+        // Schedule cron job for optimistic cleanup (stuck transactions)
+        cron.schedule('*/1 * * * *', () => {
+            console.log(`\n🧹 [${new Date().toISOString()}] Running optimistic cleanup...`);
+            cleanupStuckTransactions();
         });
 
         console.log(`✅ Refund scheduler started`);
