@@ -29,7 +29,7 @@
     "context7": {
       "httpUrl": "https://mcp.context7.com/mcp",
       "headers": {
-        "Authorization": "Bearer ctx7sk-afd5ec00-c15f-435e-b253-722105e678b2",
+        // "Authorization": "Bearer ctx7sk-afd5ec00-c15f-435e-b253-722105e678b2",
         "Accept": "application/json "
       }
     }
