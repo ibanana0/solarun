@@ -7,12 +7,12 @@
   "scripts": {
     "dev": "npx tsx watch src/index.ts",
     "start": "npx tsx src/index.ts",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:validator": "jest src/validator/__tests__",
-    "test:scheduler": "jest src/scheduler/__tests__",
-    "test:integration": "jest src/__tests__/integration.test.ts",
+    "test": "NODE_OPTIONS=--experimental-vm-modules npx jest",
+    "test:watch": "NODE_OPTIONS=--experimental-vm-modules npx jest --watch",
+    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules npx jest --coverage",
+    "test:validator": "NODE_OPTIONS=--experimental-vm-modules npx jest src/validator/__tests__",
+    "test:scheduler": "NODE_OPTIONS=--experimental-vm-modules npx jest src/scheduler/__tests__",
+    "test:integration": "NODE_OPTIONS=--experimental-vm-modules npx jest src/__tests__/integration.test.ts",
     "test:manual:validator": "npx tsx src/test-validator.ts",
     "test:manual:supabase": "npx tsx src/verify-supabase.ts",
     "test:manual:refund-scheduler": "npx tsx src/test-refund-scheduler.ts"

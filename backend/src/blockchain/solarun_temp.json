@@ -8,6 +8,143 @@
   },
   "instructions": [
     {
+      "name": "close_participant",
+      "docs": [
+        "Close a participant PDA to reclaim rent"
+      ],
+      "discriminator": [
+        192,
+        162,
+        92,
+        5,
+        148,
+        191,
+        207,
+        151
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "event_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "participant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  116,
+                  105,
+                  99,
+                  105,
+                  112,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              },
+              {
+                "kind": "arg",
+                "path": "chip_uid"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "event_id",
+          "type": "string"
+        },
+        {
+          "name": "chip_uid",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "complete_race",
+      "docs": [
+        "Complete a race (transition from Active to Completed)"
+      ],
+      "discriminator": [
+        251,
+        40,
+        105,
+        128,
+        3,
+        79,
+        193,
+        69
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "event_id"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "event_id",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "create_mock_mint",
       "docs": [
         "Create the global Mock USDC mint (one-time setup)"
@@ -269,8 +406,8 @@
           "type": "string"
         },
         {
-          "name": "vault_capacity",
-          "type": "u64"
+          "name": "max_participants",
+          "type": "u32"
         },
         {
           "name": "registration_fee",
@@ -575,6 +712,10 @@
           "type": {
             "vec": "u64"
           }
+        },
+        {
+          "name": "is_final_batch",
+          "type": "bool"
         }
       ]
     },
@@ -665,6 +806,10 @@
         },
         {
           "name": "checkpoint_id",
+          "type": "u8"
+        },
+        {
+          "name": "finish_position",
           "type": "u8"
         },
         {
@@ -813,19 +958,19 @@
       ]
     },
     {
-      "name": "start_event",
+      "name": "start_race",
       "docs": [
-        "Start an event (transition from Initialized to Active)"
+        "Start a race (transition from Initialized to Active)"
       ],
       "discriminator": [
-        61,
-        196,
-        227,
-        97,
-        8,
-        81,
-        107,
-        23
+        167,
+        209,
+        181,
+        53,
+        90,
+        108,
+        220,
+        120
       ],
       "accounts": [
         {
@@ -933,19 +1078,6 @@
       ]
     },
     {
-      "name": "EventStarted",
-      "discriminator": [
-        157,
-        79,
-        42,
-        136,
-        217,
-        220,
-        219,
-        3
-      ]
-    },
-    {
       "name": "ParticipantRegistered",
       "discriminator": [
         47,
@@ -1021,7 +1153,7 @@
     {
       "code": 6009,
       "name": "MaxParticipantsReached",
-      "msg": "E0015: Maximum participants reached for this event"
+      "msg": "Maximum participants reached"
     },
     {
       "code": 6010,
@@ -1107,6 +1239,21 @@
       "code": 6026,
       "name": "InvalidWalletFormat",
       "msg": "E0052: Invalid wallet address format"
+    },
+    {
+      "code": 6027,
+      "name": "EventNotInitialized",
+      "msg": "Event must be in Initialized status to register"
+    },
+    {
+      "code": 6028,
+      "name": "EventNotActiveForFinish",
+      "msg": "Event must be in Active status to record finish"
+    },
+    {
+      "code": 6029,
+      "name": "EventNotCompletedForRefund",
+      "msg": "Event must be in Completed status to process refunds"
     }
   ],
   "types": [
@@ -1161,6 +1308,10 @@
           },
           {
             "name": "participant_count",
+            "type": "u32"
+          },
+          {
+            "name": "max_participants",
             "type": "u32"
           },
           {
@@ -1232,31 +1383,15 @@
             "type": "pubkey"
           },
           {
+            "name": "max_participants",
+            "type": "u32"
+          },
+          {
             "name": "start_time",
             "type": "i64"
           },
           {
             "name": "end_time",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "EventStarted",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "event_id",
-            "type": "string"
-          },
-          {
-            "name": "admin",
-            "type": "pubkey"
-          },
-          {
-            "name": "start_time",
             "type": "i64"
           }
         ]

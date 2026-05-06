@@ -112,8 +112,8 @@ async function simulate() {
 
     // 6. PROCESS REFUNDS
     console.log('\nStep 6: Simulating Event Completion...');
-    console.log('   (Setting end_time to past to trigger scheduler logic)');
-    await supabase.from('race_events').update({ end_time: new Date(Date.now() - 1000).toISOString() }).eq('id', event.id);
+    console.log('   (Setting status to completed to trigger scheduler logic)');
+    await supabase.from('race_events').update({ status: 'completed' }).eq('id', event.id);
     
     console.log('   Triggering Refund Scheduler...');
     await manualTriggerRefunds();
@@ -122,6 +122,19 @@ async function simulate() {
     console.log('\nStep 7: Verifying Final State...');
     const { data: finalEvent } = await supabase.from('race_events').select('status').eq('id', event.id).single();
     const { data: finalRunners } = await supabase.from('runners').select('full_name, status, finish_position').eq('event_id', event.id).order('finish_position');
+
+    console.log(`   Event Status: ${finalEvent?.status}`);
+    finalRunners?.forEach(r => {
+        console.log(`   - ${r.full_name}: ${r.status} #${r.finish_position}`);
+    });
+
+    console.log('\n✨ SIMULATION COMPLETE!');
+}
+
+simulate().catch(e => {
+    console.error('\n❌ Simulation Failed:', e.message);
+});
+ion');
 
     console.log(`   Event Status: ${finalEvent?.status}`);
     finalRunners?.forEach(r => {

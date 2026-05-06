@@ -1,17 +1,21 @@
 pub mod create_mock_mint;
 pub mod mint_mock_usdc;
 pub mod initialize;
-pub mod start_event;
+pub mod start_race;
+pub mod complete_race;
 pub mod register_participant;
 pub mod record_finish;
 pub mod process_refunds;
 pub mod delete_event;
+pub mod close_participant;
 
 pub use create_mock_mint::*;
 pub use mint_mock_usdc::*;
 pub use initialize::*;
-pub use start_event::*;
+pub use start_race::*;
+pub use complete_race::*;
 pub use register_participant::*;
 pub use record_finish::*;
 pub use process_refunds::*;
 pub use delete_event::*;
+pub use close_participant::*;

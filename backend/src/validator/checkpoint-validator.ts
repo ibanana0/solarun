@@ -83,7 +83,7 @@ export async function validateCheckpoint(msg: CheckpointMessage): Promise<Valida
     // --- Check Event Cut-off Logic ---
     const { data: event, error: eventError } = await supabase
         .from('race_events')
-        .select('status, actual_start_time, duration_hours')
+        .select('status, end_time')
         .eq('id', runner.event_id)
         .maybeSingle();
 
@@ -95,8 +95,8 @@ export async function validateCheckpoint(msg: CheckpointMessage): Promise<Valida
         return { valid: false, error: `Event is not active (current status: ${event.status})` };
     }
 
-    if (event.actual_start_time && event.duration_hours) {
-        const cutoffTime = new Date(event.actual_start_time).getTime() + (event.duration_hours * 60 * 60 * 1000);
+    if (event.end_time) {
+        const cutoffTime = new Date(event.end_time).getTime();
         if (Date.now() > cutoffTime) {
             console.log(`[Validator] Cutoff reached for event ${runner.event_id}. Tap rejected.`);
             return { valid: false, error: "Race duration has ended" };

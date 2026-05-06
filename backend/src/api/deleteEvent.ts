@@ -10,7 +10,7 @@
  */
 
 import { supabase } from '../lib/supabase.js';
-import { buildProcessRefundsInstruction, buildDeleteEventInstruction, submitTransaction, checkConnection, getAdminKeypair } from '../blockchain/transaction-signer.js';
+import { buildProcessRefundsInstructions, buildDeleteEventInstruction, buildCloseParticipantInstruction, submitTransaction, checkConnection, getAdminKeypair } from '../blockchain/transaction-signer.js';
 import { Transaction, Keypair, PublicKey, Connection } from '@solana/web3.js';
 import * as anchor from "@coral-xyz/anchor";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
@@ -58,146 +58,117 @@ export async function deleteEventWithRefund(eventId: string) {
         const participantCount = participants?.length ?? 0;
         console.log(`   👥 Found ${participantCount} participants to refund`);
 
-        // ── Step 4: Trigger smart contract refund (if blockchain is available) ──
+        // ── Step 4: Handle blockchain operations based on event status ──
         let txSignature = null;
         const isBlockchainHealthy = await checkConnection();
 
-        if (isBlockchainHealthy && participantCount > 0) {
+        if (isBlockchainHealthy) {
             try {
-                console.log(`   ⛓️  Triggering smart contract refund...`);
-
-                const nonFinishers = participants.map(p => p.chip_uid);
                 const adminKeypair = getAdminKeypair();
-                const wallets = participants.map(p => new PublicKey(p.wallet_address));
-                
-                // FIX: registration_fee_sol stores display value (e.g. 10 for 10 USDC).
-                // Smart contract expects raw token units (6 decimals for Mock USDC).
-                // So 10 USDC = 10 * 10^6 = 10,000,000 raw units.
-                const MOCK_USDC_DECIMALS = 6;
-                const feeDisplayValue = event.registration_fee_sol || 10;
-                const refundAmountPerRunner = new anchor.BN(
-                    Math.round(feeDisplayValue * Math.pow(10, MOCK_USDC_DECIMALS))
+                const programPubkey = new PublicKey(process.env.SOLARUN_PROGRAM_ID || '');
+                const [mintPda] = PublicKey.findProgramAddressSync(
+                    [Buffer.from("mock_usdc_mint")],
+                    programPubkey
                 );
-                const amounts = participants.map(() => refundAmountPerRunner);
+                const adminAta = await getAssociatedTokenAddress(mintPda, adminKeypair.publicKey);
 
-                // LOG: Detailed refund info
-                console.log(`   📊 Refund Details:`);
-                console.log(`      - Participants: ${wallets.length}`);
-                console.log(`      - Fee (display): ${feeDisplayValue} USDC`);
-                console.log(`      - Amount per runner: ${refundAmountPerRunner.toString()} raw units`);
-                console.log(`      - Total to refund: ${refundAmountPerRunner.mul(new anchor.BN(wallets.length)).toString()} raw units`);
-                console.log(`      - Vault: ${event.vault_address}`);
-                console.log(`      - Admin signing: ${adminKeypair.publicKey.toBase58()}`);
+                // Determine on-chain status from DB status:
+                // "pending" = Initialized on-chain → can delete directly (vault USDC returned to admin)
+                // "active"  = Active on-chain → NOT deletable via smart contract (must complete first)
+                //             but we allow force-delete by skipping on-chain if needed
+                // "completed" = Completed on-chain → must processRefunds first, then delete
+                // "settled" = Already settled → should not reach here (blocked earlier)
 
-                const instruction = await buildProcessRefundsInstruction({
-                    eventId: eventId,
-                    programId: process.env.SOLARUN_PROGRAM_ID || '',
-                    vaultAddress: event.vault_address || '',
-                    adminWallet: adminKeypair.publicKey,
-                    recipientWallets: wallets,
-                    amounts: amounts,
-                    nonFinishers: nonFinishers
-                });
+                const onChainStatus = event.status; // pending | active | completed | settled
 
-                // Build and submit refund transaction
-                const transaction = new Transaction().add(instruction);
-                
-                console.log(`   🔐 Signing transaction with admin keypair...`);
-                console.log(`   ⚠️  NOTE: This uses backend admin keypair (no Phantom popup)`);
-                
-                txSignature = await submitTransaction(transaction, [adminKeypair]);
-                console.log(`   ✅ Refund transaction submitted: ${txSignature}`);
-                
-                // Verify transaction details AFTER confirmation
-                console.log(`   🔍 Verifying refund transaction on-chain...`);
-                const rpc = new Connection(process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com');
-                const txDetails = await rpc.getTransaction(txSignature);
-                
-                if (txDetails) {
-                    console.log(`   ✅ Refund transaction verified on-chain`);
-                    console.log(`      - Fee: ${txDetails.meta?.fee} lamports`);
-                    console.log(`      - Status: ${txDetails.meta?.err ? '❌ FAILED' : '✅ SUCCESS'}`);
+                if (onChainStatus === 'completed' && participantCount > 0) {
+                    // ── COMPLETED EVENT: Process refunds first, then delete ──
+                    console.log(`   ⛓️  Event is completed. Processing refunds before deletion...`);
+
+                    const nonFinishers = participants!.map((p: any) => p.chip_uid);
+                    const wallets = participants!.map((p: any) => new PublicKey(p.wallet_address));
+
+                    const MOCK_USDC_DECIMALS = 6;
+                    const feeDisplayValue = event.registration_fee_sol || 10;
+                    const refundAmountPerRunner = new anchor.BN(
+                        Math.round(feeDisplayValue * Math.pow(10, MOCK_USDC_DECIMALS))
+                    );
+                    const amounts = participants!.map(() => refundAmountPerRunner);
+
+                    console.log(`   📊 Refund Details:`);
+                    console.log(`      - Participants: ${wallets.length}`);
+                    console.log(`      - Fee (display): ${feeDisplayValue} USDC`);
+                    console.log(`      - Amount per runner: ${refundAmountPerRunner.toString()} raw units`);
+                    console.log(`      - Vault: ${event.vault_address}`);
+                    console.log(`      - Admin signing: ${adminKeypair.publicKey.toBase58()}`);
+
+                    const instructions = await buildProcessRefundsInstructions({
+                        eventId: eventId,
+                        programId: process.env.SOLARUN_PROGRAM_ID || '',
+                        vaultAddress: event.vault_address || '',
+                        adminWallet: adminKeypair.publicKey,
+                        recipientWallets: wallets,
+                        amounts: amounts,
+                        nonFinishers: nonFinishers,
+                        isFinalBatch: true
+                    });
+
+                    const transaction = new Transaction().add(...instructions);
+                    console.log(`   🔐 Signing refund transaction with admin keypair...`);
+                    txSignature = await submitTransaction(transaction, [adminKeypair]);
+                    console.log(`   ✅ Refund transaction submitted: ${txSignature}`);
+                } else if (onChainStatus === 'pending') {
+                    // ── PENDING/INITIALIZED EVENT: No refund needed ──
+                    // delete_event will return all vault USDC to admin directly
+                    console.log(`   ℹ️  Event is pending (Initialized). Skipping processRefunds.`);
+                    console.log(`      Vault funds will be returned to admin via delete_event.`);
+                } else if (onChainStatus === 'active') {
+                    // ── ACTIVE EVENT: Cannot delete on-chain directly ──
+                    // Smart contract requires Initialized or Settled for delete_event
+                    // We'll skip on-chain operations and just clean up the database
+                    console.warn(`   ⚠️  Event is active. Smart contract doesn't allow deleting active events.`);
+                    console.warn(`      Skipping on-chain operations. Database will be cleaned up.`);
+                    console.warn(`      ⚠️  Note: On-chain vault funds may remain locked until event is completed.`);
+                }
+
+                // ── Call delete_event for pending/completed(settled) events ──
+                if (onChainStatus === 'pending' || onChainStatus === 'completed') {
+                    console.log(`\n   🗑️  Calling delete_event to close on-chain accounts...`);
+                    console.log(`      Admin ATA: ${adminAta.toBase58()}`);
+
+                    const deleteInstruction = await buildDeleteEventInstruction({
+                        eventId: eventId,
+                        programId: process.env.SOLARUN_PROGRAM_ID || '',
+                        vaultAddress: event.vault_address || '',
+                        adminWallet: adminKeypair.publicKey,
+                        adminTokenAccount: adminAta,
+                    });
+
+                    const deleteTransaction = new Transaction().add(deleteInstruction);
+                    const deleteTxSig = await submitTransaction(deleteTransaction, [adminKeypair]);
+                    console.log(`   ✅ delete_event transaction confirmed: ${deleteTxSig}`);
+                    console.log(`      - Vault closed, remaining USDC → admin ATA`);
+                    console.log(`      - Event PDA closed, rent → admin wallet`);
+                }
+
+            } catch (error: any) {
+                const errorStr = String(error);
+                const isStaleEvent = errorStr.includes('Custom: 2006') || errorStr.includes('0x7d6') || errorStr.includes('seeds constraint');
+
+                if (isStaleEvent) {
+                    console.warn(`\n   ⚠️  DATA MISMATCH DETECTED (Error 2006)`);
+                    console.warn(`      Event ini menggunakan struktur data lama yang tidak kompatibel.`);
+                    console.warn(`      Melewati operasi blockchain dan lanjut menghapus dari database...`);
+                } else {
+                    console.warn(`   ⚠️  Smart contract operation failed: ${error}`);
+                    console.error(`   ❌ Blockchain operation GAGAL: ${error}`);
                     
-                    if (txDetails.meta?.err) {
-                        console.error(`      - Error details: ${JSON.stringify(txDetails.meta.err)}`);
-                        throw new Error(`Transaction failed on-chain: ${JSON.stringify(txDetails.meta.err)}`);
+                    if (error instanceof Error) {
+                        console.error(`   Error stack: ${error.stack}`);
                     }
                     
-                    console.log(`      - Logs:`);
-                    txDetails.meta?.logMessages?.forEach(log => {
-                        if (log.includes('ERROR') || log.includes('error') || log.includes('failed')) {
-                            console.error(`         📌 ${log}`);
-                        } else if (log.includes('Refund') || log.includes('transfer')) {
-                            console.log(`         ✓ ${log}`);
-                        }
-                    });
-                } else {
-                    console.warn(`   ⚠️  Could not fetch refund transaction details from RPC`);
+                    throw new Error(`Operasi blockchain gagal. Data database tetap dipertahankan. Error: ${error}`);
                 }
-
-                // ── Step 4b: Call delete_event to close vault & event PDA on-chain ──
-                console.log(`\n   🗑️  Calling delete_event to close on-chain accounts...`);
-
-                // Derive the mint PDA (mock_usdc_mint)
-                const programPubkey = new PublicKey(process.env.SOLARUN_PROGRAM_ID || '');
-                const [mintPda] = PublicKey.findProgramAddressSync(
-                    [Buffer.from("mock_usdc_mint")],
-                    programPubkey
-                );
-
-                // Get admin's ATA for the Mock USDC mint
-                const adminAta = await getAssociatedTokenAddress(mintPda, adminKeypair.publicKey);
-                console.log(`      Admin ATA: ${adminAta.toBase58()}`);
-
-                const deleteInstruction = await buildDeleteEventInstruction({
-                    eventId: eventId,
-                    programId: process.env.SOLARUN_PROGRAM_ID || '',
-                    vaultAddress: event.vault_address || '',
-                    adminWallet: adminKeypair.publicKey,
-                    adminTokenAccount: adminAta,
-                });
-
-                const deleteTransaction = new Transaction().add(deleteInstruction);
-                const deleteTxSig = await submitTransaction(deleteTransaction, [adminKeypair]);
-                console.log(`   ✅ delete_event transaction confirmed: ${deleteTxSig}`);
-                console.log(`      - Vault closed, remaining USDC → admin ATA`);
-                console.log(`      - Event PDA closed, rent → admin wallet`);
-
-            } catch (error) {
-                console.warn(`   ⚠️  Smart contract operation failed: ${error}`);
-                console.error(`   ❌ Blockchain operation GAGAL: ${error}`);
-                
-                // Additional debugging info
-                if (error instanceof Error) {
-                    console.error(`   Error stack: ${error.stack}`);
-                }
-                
-                throw new Error(`Operasi blockchain gagal. Data database tetap dipertahankan. Error: ${error}`);
-            }
-        } else if (participantCount === 0 && isBlockchainHealthy) {
-            console.log(`   ℹ️  No participants to refund, but still cleaning up on-chain...`);
-            try {
-                const adminKeypair = getAdminKeypair();
-                const programPubkey = new PublicKey(process.env.SOLARUN_PROGRAM_ID || '');
-                const [mintPda] = PublicKey.findProgramAddressSync(
-                    [Buffer.from("mock_usdc_mint")],
-                    programPubkey
-                );
-                const adminAta = await getAssociatedTokenAddress(mintPda, adminKeypair.publicKey);
-
-                const deleteInstruction = await buildDeleteEventInstruction({
-                    eventId: eventId,
-                    programId: process.env.SOLARUN_PROGRAM_ID || '',
-                    vaultAddress: event.vault_address || '',
-                    adminWallet: adminKeypair.publicKey,
-                    adminTokenAccount: adminAta,
-                });
-
-                const deleteTransaction = new Transaction().add(deleteInstruction);
-                const deleteTxSig = await submitTransaction(deleteTransaction, [adminKeypair]);
-                console.log(`   ✅ delete_event transaction confirmed: ${deleteTxSig}`);
-            } catch (error) {
-                console.warn(`   ⚠️  On-chain cleanup failed: ${error}`);
             }
         } else {
             console.warn(`   ⚠️  Blockchain not available, skipping smart contract operations`);

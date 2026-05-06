@@ -6,7 +6,10 @@ use crate::error::ErrorCode;
 #[derive(Accounts)]
 #[instruction(event_id: String, chip_uid: String)]
 pub struct RecordFinish<'info> {
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = backend.key() == event.admin @ ErrorCode::UnauthorizedBackend
+    )]
     pub backend: Signer<'info>,
 
     #[account(
@@ -29,6 +32,7 @@ pub fn handler(
     event_id: String,
     chip_uid: String,
     checkpoint_id: u8,
+    finish_position: u8,
     _timestamp: i64,
 ) -> Result<()> {
     let event = &ctx.accounts.event;
@@ -66,11 +70,9 @@ pub fn handler(
             participant.status = ParticipantStatus::Finished;
             participant.finished_at = Some(Clock::get()?.unix_timestamp);
 
-            if participant.finish_position.is_none() {
-                participant.finish_position = Some(1);
-            }
+            participant.finish_position = Some(finish_position);
 
-            msg!("Participant {} finished", chip_uid);
+            msg!("Participant {} finished at position {}", chip_uid, finish_position);
         }
         _ => {
             return Err(ErrorCode::InvalidCheckpointId.into());

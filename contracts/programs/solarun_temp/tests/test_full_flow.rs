@@ -72,7 +72,7 @@ fn initialize_event(
         *program_id,
         &solarun_temp::instruction::InitializeEvent {
             event_id: event_id.to_string(),
-            vault_capacity: 100_000_000,
+            max_participants: 100,
             registration_fee: 1_000_000,
             start_time: 1700000000,
             end_time: 1700003600,
@@ -158,7 +158,7 @@ fn register_participant(
     send_ix(svm, runner, ix).unwrap();
 }
 
-fn start_event(
+fn start_race(
     svm: &mut LiteSVM,
     payer: &Keypair,
     program_id: &Pubkey,
@@ -167,10 +167,10 @@ fn start_event(
 ) {
     let ix = Instruction::new_with_bytes(
         *program_id,
-        &solarun_temp::instruction::StartEvent {
+        &solarun_temp::instruction::StartRace {
             event_id: event_id.to_string(),
         }.data(),
-        solarun_temp::accounts::StartEvent {
+        solarun_temp::accounts::StartRace {
             admin: payer.pubkey(),
             event: event_pda,
         }.to_account_metas(None),
@@ -198,6 +198,7 @@ fn record_finish(
             event_id: event_id.to_string(),
             chip_uid: chip_uid.to_string(),
             checkpoint_id: 2, // finish
+            finish_position: position,
             timestamp: 1700001000 + (position as i64 * 100),
         }.data(),
         solarun_temp::accounts::RecordFinish {
@@ -207,6 +208,26 @@ fn record_finish(
         }.to_account_metas(None),
     );
     send_ix(svm, admin, ix).unwrap();
+}
+
+fn complete_race(
+    svm: &mut LiteSVM,
+    payer: &Keypair,
+    program_id: &Pubkey,
+    event_id: &str,
+    event_pda: Pubkey,
+) {
+    let ix = Instruction::new_with_bytes(
+        *program_id,
+        &solarun_temp::instruction::CompleteRace {
+            event_id: event_id.to_string(),
+        }.data(),
+        solarun_temp::accounts::CompleteRace {
+            admin: payer.pubkey(),
+            event: event_pda,
+        }.to_account_metas(None),
+    );
+    send_ix(svm, payer, ix).unwrap();
 }
 
 #[test]
@@ -229,11 +250,48 @@ fn test_full_e2e_flow() {
         runners.push((runner, chip_uid));
     }
 
-    start_event(&mut svm, &admin, &program_id, event_id, event_pda);
+    start_race(&mut svm, &admin, &program_id, event_id, event_pda);
+
+    // Verify registration fails after race starts
+    let late_runner = Keypair::new();
+    svm.airdrop(&late_runner.pubkey(), 1_000_000_000).unwrap();
+    mint_usdc_to(&mut svm, &late_runner, &program_id, mock_usdc_mint, mint_authority, 5_000_000);
+    let late_chip_uid = "chip_late";
+    
+    let (participant_pda, _) = Pubkey::find_program_address(
+        &[b"participant", event_pda.as_ref(), late_chip_uid.as_bytes()],
+        &program_id,
+    );
+    let runner_token_account = get_ata(&late_runner.pubkey(), &mock_usdc_mint);
+
+    let ix_late_reg = Instruction::new_with_bytes(
+        program_id,
+        &solarun_temp::instruction::RegisterParticipant {
+            event_id: event_id.to_string(),
+            chip_uid: late_chip_uid.to_string(),
+            wallet_address: late_runner.pubkey(),
+            full_name: "Late Runner".to_string(),
+            runner_id: "run_late".to_string(),
+        }.data(),
+        solarun_temp::accounts::RegisterParticipant {
+            runner: late_runner.pubkey(),
+            event: event_pda,
+            participant: participant_pda,
+            runner_token_account,
+            vault: vault_pda,
+            system_program: system_program::id(),
+            token_program: spl_token::id(),
+        }.to_account_metas(None),
+    );
+
+    let res = send_ix(&mut svm, &late_runner, ix_late_reg);
+    assert!(res.is_err(), "Registration should fail after race starts");
 
     // Record finish for runners 0 and 1
     record_finish(&mut svm, &admin, &program_id, event_id, event_pda, &runners[0].1, 1);
     record_finish(&mut svm, &admin, &program_id, event_id, event_pda, &runners[1].1, 2);
+
+    complete_race(&mut svm, &admin, &program_id, event_id, event_pda);
 
     // Process refunds
     let mut metas = solarun_temp::accounts::ProcessRefunds {
@@ -263,6 +321,7 @@ fn test_full_e2e_flow() {
             non_finishers: vec![runners[2].1.clone()],
             recipient_wallets: vec![runners[0].0.pubkey(), runners[1].0.pubkey()],
             amounts,
+            is_final_batch: true,
         }.data(),
         metas,
     );

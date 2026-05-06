@@ -44,7 +44,7 @@ fn test_initialize() {
 
     // 2. Initialize event
     let event_id = "test_event".to_string();
-    let vault_capacity = 100_000_000;
+    let max_participants = 100;
     let registration_fee = 1_000_000;
     let start_time = 1700000000;
     let end_time = 1700003600;
@@ -62,7 +62,7 @@ fn test_initialize() {
         program_id,
         &solarun_temp::instruction::InitializeEvent {
             event_id,
-            vault_capacity,
+            max_participants,
             registration_fee,
             start_time,
             end_time,

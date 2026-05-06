@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, CheckCircle, Loader2, LogIn, Copy, Check, Ticket } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useEvents, useEvent } from '@/hooks/useEvent';
+import { useRunners } from '@/hooks/useRunners';
 import { useAuth } from '@/hooks/useAuth';
+import { useBalance } from '@/hooks/useBalance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,23 +39,36 @@ import { PublicKey } from '@solana/web3.js';
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { v4 as uuidv4 } from 'uuid';
 
-export default function RegisterPage() {
+function RegisterPageContent() {
     const searchParams = useSearchParams();
     const eventIdFromUrl = searchParams.get('event');
-    
+
     const { ready, authenticated, walletAddress, login } = useAuth();
     const { data: events, isLoading: eventsLoading } = useEvents();
     const { data: eventDetails, isLoading: eventDetailsLoading } = useEvent(eventIdFromUrl || '');
+    const [eventId, setEventId] = useState(eventIdFromUrl || '');
+    const { data: runners } = useRunners(eventId);
+    const { usdcBalance, solBalance, loading: balanceLoading } = useBalance();
     const program = useProgram();
 
     const [fullName, setFullName] = useState('');
     const [chipUid, setChipUid] = useState('');
-    const [eventId, setEventId] = useState(eventIdFromUrl || '');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<{ eventId: string; txSignature?: string } | null>(null);
     const [usedChips, setUsedChips] = useState<string[]>([]);
     const [copied, setCopied] = useState(false);
+
+    // Get current event object for status/capacity checks
+    const event = eventIdFromUrl ? eventDetails : events?.find(e => e.id === eventId);
+
+    // Balance checks
+    const feeRequired = event?.registration_fee_sol || 0;
+    const hasEnoughUsdc = usdcBalance >= feeRequired;
+    const hasEnoughSol = solBalance > 0.005; // reasonable minimum for gas
+    const isBalanceSufficient = hasEnoughUsdc && hasEnoughSol;
+
+    const canRegister = event?.status === 'pending' && (runners?.length ?? 0) < event.max_participants && isBalanceSufficient;
 
     // Sync eventId with URL param if it changes
     useEffect(() => {
@@ -100,6 +115,12 @@ export default function RegisterPage() {
             const programId = program.programId;
             const runner = program.provider.publicKey;
 
+            if (!runner) {
+                setError('Provider publicKey tidak tersedia.');
+                setSubmitting(false);
+                return;
+            }
+
             // --- Derive PDAs ---
             const [eventPda] = PublicKey.findProgramAddressSync(
                 [Buffer.from('event'), Buffer.from(blockchainEventId)],
@@ -114,7 +135,7 @@ export default function RegisterPage() {
             // LOGIKA PEMERIKSAAN ON-CHAIN
             // ============================================================
             const existingAccount = await program.provider.connection.getAccountInfo(participantPda);
-            
+
             if (existingAccount !== null) {
                 // Jika accountInfo tidak null, berarti PDA ini sudah ada (sudah di-init)
                 setError('Chip ini sudah terdaftar untuk event ini di blockchain.');
@@ -273,9 +294,9 @@ export default function RegisterPage() {
                     <CardDescription>
                         Isi form di bawah untuk mendaftarkan diri.
                     </CardDescription>
-                    
+
                     <div className="pt-4 mt-4 border-t">
-                        <button 
+                        <button
                             onClick={handleCopyAddress}
                             className="flex items-center justify-between w-full p-2 text-left transition-colors border border-transparent rounded-md bg-secondary/50 hover:bg-secondary group hover:border-border"
                             title="Salin alamat wallet"
@@ -360,7 +381,7 @@ export default function RegisterPage() {
                             <Label htmlFor="full_name">Nama Lengkap</Label>
                             <Input
                                 id="full_name"
-                                placeholder="Contoh: Budi Santoso"
+                                placeholder="Your Name"
                                 value={fullName}
                                 onChange={(e) => { setFullName(e.target.value); setError(null); }}
                                 disabled={submitting}
@@ -395,18 +416,53 @@ export default function RegisterPage() {
                             <p className="text-sm text-destructive">{error}</p>
                         )}
 
+                        {event && event.status === 'pending' && !isBalanceSufficient && (
+                            <div className="p-3 text-sm border rounded-lg bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-300">
+                                <p className="font-semibold mb-1">⚠️ Saldo Tidak Mencukupi</p>
+                                <ul className="list-disc pl-4 space-y-1 text-xs">
+                                    {!hasEnoughUsdc && (
+                                        <li>Saldo Mock USDC: {usdcBalance.toFixed(2)} (Butuh {feeRequired})</li>
+                                    )}
+                                    {!hasEnoughSol && (
+                                        <li>Saldo SOL (Gas): {solBalance.toFixed(3)} (Butuh &gt; 0.005 SOL)</li>
+                                    )}
+                                </ul>
+                                <p className="mt-2 text-xs opacity-80">Gunakan tombol "Faucet USDC" di menu atas jika butuh Mock USDC.</p>
+                            </div>
+                        )}
+
                         <Button
                             type="submit"
                             className="w-full"
-                            disabled={submitting || eventsLoading || (eventIdFromUrl ? !eventDetails : activeEvents.length === 0)}
+                            disabled={!canRegister || submitting || eventsLoading || (eventIdFromUrl ? !eventDetails : activeEvents.length === 0)}
                         >
                             {submitting ? (
                                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Mendaftarkan...</>
-                            ) : 'Daftar Sekarang'}
+                            ) : event && runners && runners.length >= event.max_participants ? (
+                                'Event Full'
+                            ) : event?.status !== 'pending' && event?.status !== undefined ? (
+                                'Registration Closed'
+                            ) : !isBalanceSufficient && event ? (
+                                'Saldo Kurang'
+                            ) : (
+                                'Daftar Sekarang'
+                            )}
                         </Button>
                     </form>
                 </CardContent>
             </Card>
         </div>
+    );
+}
+
+export default function RegisterPage() {
+    return (
+        <Suspense fallback={
+            <div className="container max-w-md py-12 text-center">
+                <Loader2 className="w-8 h-8 mx-auto animate-spin text-muted-foreground" />
+            </div>
+        }>
+            <RegisterPageContent />
+        </Suspense>
     );
 }

@@ -111,12 +111,10 @@ async function runTests() {
         }
 
         // Query completed events
-        const now = new Date();
         const { data: completedEvents, error: queryError } = await supabase
             .from('race_events')
             .select('*')
-            .eq('status', 'active')
-            .lte('end_time', now.toISOString());
+            .eq('status', 'completed');
 
         if (queryError) {
             throw queryError;

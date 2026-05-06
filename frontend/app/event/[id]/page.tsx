@@ -8,6 +8,7 @@ import { useRunners } from '@/hooks/useRunners';
 import { useAuth } from '@/hooks/useAuth';
 import { useProgram } from '@/hooks/useProgram';
 import { supabase } from '@/lib/supabase';
+import { PublicKey } from '@solana/web3.js';
 import { StatusBadge } from '@/components/StatusBadge';
 import { LeaderboardTable } from '@/components/LeaderboardTable';
 import { Button } from '@/components/ui/button';
@@ -45,52 +46,78 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
         setIsStarting(true);
         try {
             const cleanEventId = event.id.replace(/-/g, '');
-            const txSignature = await (program.methods as any)
+            
+            // Derive Event PDA correctly
+            const [eventPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from('event'), Buffer.from(cleanEventId)],
+                program.programId
+            );
+
+            const txSignature = await program.methods
                 .startRace(cleanEventId)
                 .accounts({
                     admin: program.provider.publicKey,
-                    event: program.provider.publicKey, // will be resolved inside startRace normally by PDA but Anchor can auto-resolve if we use the proper IDL mapping, let's let Anchor resolve or just rely on backend webhook if direct call fails
-                })
+                    event: eventPda,
+                } as any)
                 .rpc();
                 
             console.log("Race started on-chain:", txSignature);
             
+            // Update Supabase to match on-chain state
             await supabase.from('race_events').update({ 
-                status: 'active',
-                actual_start_time: new Date().toISOString()
+                status: 'active'
             }).eq('id', event.id);
             
-            alert('Race berhasil dimulai!');
+            alert(`✅ Race berhasil dimulai!\n\nTX: ${txSignature}`);
             refetchEvent();
         } catch (error: any) {
             console.error("Failed to start race:", error);
-            
-            // Fallback: If Anchor complains about unresolved accounts, let's just update DB for MVP
-            // as the backend webhook / manual start is mainly a DB state flip that triggers sensor validation
-            console.log("Falling back to DB-only update for MVP...");
-            await supabase.from('race_events').update({ 
-                status: 'active',
-                actual_start_time: new Date().toISOString()
-            }).eq('id', event.id);
-            alert('Race berhasil dimulai (DB updated)!');
-            refetchEvent();
+            let msg = error.message || String(error);
+            if (msg.includes('Custom: 2006')) {
+                msg = "Data event tidak kompatibel (Error 2006). Kemungkinan event ini dibuat dengan versi contract lama. Silakan buat event baru.";
+            }
+            alert(`❌ Gagal memulai race: ${msg}`);
         } finally {
             setIsStarting(false);
         }
     };
 
     const handleFinalize = async () => {
-        if (!event) return;
+        if (!program || !event) return;
         if (!confirm('Apakah Anda yakin ingin memfinalisasi event? Ini akan memicu pembagian hadiah otomatis.')) return;
         
         setIsFinalizing(true);
         try {
+            const cleanEventId = event.id.replace(/-/g, '');
+            
+            // Derive Event PDA correctly
+            const [eventPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from('event'), Buffer.from(cleanEventId)],
+                program.programId
+            );
+
+            // 1. Finalize on-chain
+            const txSignature = await program.methods
+                .completeRace(cleanEventId)
+                .accounts({
+                    admin: program.provider.publicKey,
+                    event: eventPda,
+                } as any)
+                .rpc();
+                
+            console.log("Race completed on-chain:", txSignature);
+
+            // 2. Update Supabase
             await supabase.from('race_events').update({ status: 'completed' }).eq('id', event.id);
-            alert('Event berhasil difinalisasi! Sistem akan mulai membagikan hadiah.');
+            alert(`✅ Event berhasil difinalisasi!\nSistem akan mulai membagikan hadiah.\n\nTX: ${txSignature}`);
             refetchEvent();
         } catch (error: any) {
-            console.error("Failed to finalize event:", error);
-            alert(`Gagal: ${error.message}`);
+            console.error("Failed to finalize race:", error);
+            let msg = error.message || String(error);
+            if (msg.includes('Custom: 2006')) {
+                msg = "Data event tidak kompatibel (Error 2006). Kemungkinan event ini dibuat dengan versi contract lama. Silakan buat event baru.";
+            }
+            alert(`❌ Gagal finalisasi race: ${msg}`);
         } finally {
             setIsFinalizing(false);
         }

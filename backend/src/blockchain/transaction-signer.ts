@@ -19,6 +19,7 @@ import {
     TransactionInstruction,
     sendAndConfirmTransaction,
     SystemProgram,
+    ComputeBudgetProgram,
 } from '@solana/web3.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -86,7 +87,7 @@ export function initBlockchainClient() {
 /**
  * Get the Solana connection (lazy initialize if needed)
  */
-function getConnection(): Connection {
+export function getConnection(): Connection {
     if (!connection) {
         connection = new Connection(SOLANA_RPC_URL, 'confirmed');
     }
@@ -103,17 +104,45 @@ export function getAdminKeypair(): Keypair {
     return adminKeypair;
 }
 
+/**
+ * Fetch Event account data from on-chain
+ */
+export async function getEventAccount(eventId: string): Promise<any> {
+    const cleanEventId = eventId.replace(/-/g, '');
+    const programId = process.env.SOLARUN_PROGRAM_ID;
+    
+    if (!programId) throw new Error('SOLARUN_PROGRAM_ID not set');
+
+    const provider = new anchor.AnchorProvider(
+        getConnection(),
+        new anchor.Wallet(getAdminKeypair()),
+        { commitment: "confirmed" }
+    );
+
+    const program = new Program(
+        { ...idl, address: programId } as Idl,
+        provider
+    );
+
+    const [eventPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("event"), Buffer.from(cleanEventId)],
+        program.programId
+    );
+
+    return await program.account.event.fetch(eventPda);
+}
+
 // ============================================================================
 // Transaction Builders
 // ============================================================================
 
 /**
- * Build instruction for process_refunds
+ * Build instructions for process_refunds
  *
  * This instruction:
  * - Distributes prizes to top 4 finishers
  * - Distributes refunds to non-finishers
- * - Marks event as settled
+ * - Marks event as settled (if isFinalBatch is true)
  */
 export interface ProcessRefundsParams {
     eventId: string;
@@ -123,23 +152,25 @@ export interface ProcessRefundsParams {
     recipientWallets: PublicKey[];
     amounts: anchor.BN[];
     nonFinishers: string[];
+    isFinalBatch: boolean;
     mint?: PublicKey; // Optional: will derive default if not provided
 }
 
-export async function buildProcessRefundsInstruction(
+export async function buildProcessRefundsInstructions(
     params: ProcessRefundsParams
-): Promise<anchor.web3.TransactionInstruction> {
-    const { eventId, vaultAddress, adminWallet, programId, recipientWallets, amounts, nonFinishers, mint } = params;
+): Promise<anchor.web3.TransactionInstruction[]> {
+    const { eventId, vaultAddress, adminWallet, programId, recipientWallets, amounts, nonFinishers, isFinalBatch, mint } = params;
 
     // 1. Pembersihan UUID (Remove dashes)
     const cleanEventId = eventId.replace(/-/g, '');
 
     try {
-        console.log(`\n📋 Building processRefunds instruction...`);
+        console.log(`\n📋 Building processRefunds instructions...`);
         console.log(`   Event ID: ${cleanEventId}`);
         console.log(`   Program ID: ${programId}`);
         console.log(`   Vault: ${vaultAddress}`);
         console.log(`   Admin: ${adminWallet.toBase58()}`);
+        console.log(`   Final Batch: ${isFinalBatch}`);
 
         const provider = new anchor.AnchorProvider(
             getConnection(),
@@ -190,14 +221,20 @@ export async function buildProcessRefundsInstruction(
 
         console.log(`   ✓ Built ${remainingAccounts.length} recipient accounts`);
 
-        // 5. Gunakan MethodsBuilder dengan 5 argumen sesuai IDL
-        const instruction = await (program.methods as any)
+        // 5. Add Compute Budget Instruction to handle large batches
+        const computeBudgetInstruction = ComputeBudgetProgram.setComputeUnitLimit({
+            units: 1_400_000,
+        });
+
+        // 6. Gunakan MethodsBuilder dengan 6 argumen sesuai IDL yang sudah diupdate
+        const mainInstruction = await (program.methods as any)
             .processRefunds(
                 cleanEventId,
                 [], // finishers: Vec<FinisherData>
                 nonFinishers, // non_finishers: Vec<string>
                 recipientWallets, // recipient_wallets: Vec<PublicKey>
-                amounts  // amounts: Vec<u64>
+                amounts,  // amounts: Vec<u64>
+                isFinalBatch // Sesuai update di SC
             )
             .accounts({
                 admin: adminWallet,
@@ -208,11 +245,10 @@ export async function buildProcessRefundsInstruction(
             .remainingAccounts(remainingAccounts) // SANGAT PENTING: Mencegah Error 6020
             .instruction();
 
-        console.log(`✅ Instruction built successfully`);
-        console.log(`   Size: ${instruction.data.length} bytes`);
-        return instruction;
+        console.log(`✅ Instructions built successfully`);
+        return [computeBudgetInstruction, mainInstruction];
     } catch (error) {
-        console.error('❌ Error building processRefunds instruction:', error);
+        console.error('❌ Error building processRefunds instructions:', error);
         if (error instanceof Error) {
             console.error(`   Message: ${error.message}`);
             if ('stack' in error) console.error(`   Stack: ${error.stack}`);
@@ -383,8 +419,190 @@ export async function buildDeleteEventInstruction(
 }
 
 // ============================================================================
+// Close Participant Instruction Builder
+// ============================================================================
+
+export interface CloseParticipantParams {
+    eventId: string;
+    programId: string;
+    adminWallet: PublicKey;
+    chipUid: string;
+}
+
+export async function buildCloseParticipantInstruction(
+    params: CloseParticipantParams
+): Promise<anchor.web3.TransactionInstruction> {
+    const { eventId, adminWallet, programId, chipUid } = params;
+
+    const cleanEventId = eventId.replace(/-/g, '');
+
+    try {
+        const provider = new anchor.AnchorProvider(
+            getConnection(),
+            new anchor.Wallet(getAdminKeypair()),
+            { commitment: "confirmed" }
+        );
+
+        const program = new Program(
+            { ...idl, address: programId } as Idl,
+            provider
+        );
+
+        const [eventPda] = PublicKey.findProgramAddressSync(
+            [Buffer.from("event"), Buffer.from(cleanEventId)],
+            program.programId
+        );
+        
+        const [participantPda] = PublicKey.findProgramAddressSync(
+            [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(chipUid)],
+            program.programId
+        );
+
+        const instruction = await (program.methods as any)
+            .closeParticipant(cleanEventId, chipUid)
+            .accounts({
+                admin: adminWallet,
+                event: eventPda,
+                participant: participantPda,
+            })
+            .instruction();
+
+        return instruction;
+    } catch (error) {
+        console.error(`❌ Error building closeParticipant instruction for chip ${chipUid}:`, error);
+        throw error;
+    }
+}
+
+// ============================================================================
 // Debug / Testing
 // ============================================================================
+
+export async function completeRaceOnChain(eventId: string): Promise<string> {
+    const cleanEventId = eventId.replace(/-/g, '');
+    const programId = process.env.SOLARUN_PROGRAM_ID;
+    if (!programId) throw new Error('SOLARUN_PROGRAM_ID not set');
+
+    const provider = new anchor.AnchorProvider(
+        getConnection(),
+        new anchor.Wallet(getAdminKeypair()),
+        { commitment: "confirmed" }
+    );
+
+    const program = new Program(
+        { ...idl, address: programId } as Idl,
+        provider
+    );
+
+    const [eventPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("event"), Buffer.from(cleanEventId)],
+        program.programId
+    );
+
+    const tx = await (program.methods as any)
+        .completeRace(cleanEventId)
+        .accounts({
+            admin: getAdminKeypair().publicKey,
+            event: eventPda,
+        })
+        .rpc();
+
+    return tx;
+}
+
+export async function startRaceOnChain(eventId: string): Promise<string> {
+    const cleanEventId = eventId.replace(/-/g, '');
+    const programId = process.env.SOLARUN_PROGRAM_ID;
+    if (!programId) throw new Error('SOLARUN_PROGRAM_ID not set');
+
+    const provider = new anchor.AnchorProvider(
+        getConnection(),
+        new anchor.Wallet(getAdminKeypair()),
+        { commitment: "confirmed" }
+    );
+
+    const program = new Program(
+        { ...idl, address: programId } as Idl,
+        provider
+    );
+
+    const [eventPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("event"), Buffer.from(cleanEventId)],
+        program.programId
+    );
+
+    const tx = await (program.methods as any)
+        .startRace(cleanEventId)
+        .accounts({
+            admin: getAdminKeypair().publicKey,
+            event: eventPda,
+        })
+        .rpc();
+
+    return tx;
+}
+
+export async function initializeEventOnChain(
+    eventId: string,
+    maxParticipants: number,
+    registrationFee: anchor.BN,
+    startTime: anchor.BN,
+    endTime: anchor.BN
+): Promise<{ signature: string; vaultAddress: string }> {
+    const cleanEventId = eventId.replace(/-/g, '');
+    const programId = process.env.SOLARUN_PROGRAM_ID;
+    if (!programId) throw new Error('SOLARUN_PROGRAM_ID not set');
+
+    const provider = new anchor.AnchorProvider(
+        getConnection(),
+        new anchor.Wallet(getAdminKeypair()),
+        { commitment: "confirmed" }
+    );
+
+    const program = new Program(
+        { ...idl, address: programId } as Idl,
+        provider
+    );
+
+    const [eventPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("event"), Buffer.from(cleanEventId)],
+        program.programId
+    );
+
+    const [vaultPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("vault"), eventPda.toBuffer()],
+        program.programId
+    );
+
+    const [mintPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("mock_usdc_mint")],
+        program.programId
+    );
+
+    console.log(`   Initializing on-chain for Event ID (clean): ${cleanEventId}`);
+    console.log(`   Event PDA: ${eventPda.toBase58()}`);
+    console.log(`   Vault PDA: ${vaultPda.toBase58()}`);
+
+    const tx = await (program.methods as any)
+        .initializeEvent(
+            cleanEventId,
+            new anchor.BN(maxParticipants),
+            registrationFee,
+            startTime,
+            endTime
+        )
+        .accounts({
+            admin: getAdminKeypair().publicKey,
+            event: eventPda,
+            mockUsdcMint: mintPda,
+            vault: vaultPda,
+            systemProgram: SystemProgram.programId,
+            tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .rpc();
+
+    return { signature: tx, vaultAddress: vaultPda.toBase58() };
+}
 
 /**
  * Log blockchain client status (for debugging)

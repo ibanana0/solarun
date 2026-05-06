@@ -42,6 +42,7 @@ pub fn handler<'info>(
     _non_finishers: Vec<String>,
     _recipient_wallets: Vec<Pubkey>,
     amounts: Vec<u64>,
+    is_final_batch: bool,
 ) -> Result<()> {
     // Read event data we need BEFORE taking mutable reference
     let event_id_str = ctx.accounts.event.event_id.clone();
@@ -49,6 +50,7 @@ pub fn handler<'info>(
     let vault_balance = ctx.accounts.vault.amount;
 
     require!(event_id_str == event_id, ErrorCode::RefundEventNotFound);
+    require!(ctx.accounts.event.status == EventStatus::Completed, ErrorCode::EventNotCompleted);
 
     // 1. Validasi total yang akan didistribusikan vs saldo vault
     // Menggunakan checked_add untuk mencegah overflow saat penjumlahan di Rust
@@ -89,9 +91,11 @@ pub fn handler<'info>(
         }
     }
 
-    // Now take mutable reference for status update
-    let event = &mut ctx.accounts.event;
-    event.status = EventStatus::Settled;
+    // Now take mutable reference for status update if final batch
+    if is_final_batch {
+        let event = &mut ctx.accounts.event;
+        event.status = EventStatus::Settled;
+    }
 
     emit!(RefundsProcessed {
         event_id: event_id.clone(),

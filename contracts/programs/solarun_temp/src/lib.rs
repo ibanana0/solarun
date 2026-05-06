@@ -29,20 +29,28 @@ pub mod solarun_temp {
     pub fn initialize_event(
         ctx: Context<InitializeEvent>,
         event_id: String,
-        vault_capacity: u64,
+        max_participants: u32,
         registration_fee: u64,
         start_time: i64,
         end_time: i64,
     ) -> Result<()> {
-        initialize::handler(ctx, event_id, vault_capacity, registration_fee, start_time, end_time)
+        initialize::handler(ctx, event_id, max_participants, registration_fee, start_time, end_time)
     }
 
-    /// Start an event (transition from Initialized to Active)
-    pub fn start_event(
-        ctx: Context<StartEvent>,
+    /// Start a race (transition from Initialized to Active)
+    pub fn start_race(
+        ctx: Context<StartRace>,
         event_id: String,
     ) -> Result<()> {
-        start_event::handler(ctx, event_id)
+        start_race::handler(ctx, event_id)
+    }
+
+    /// Complete a race (transition from Active to Completed)
+    pub fn complete_race(
+        ctx: Context<CompleteRace>,
+        event_id: String,
+    ) -> Result<()> {
+        complete_race::handler(ctx, event_id)
     }
 
     /// Register a participant for an event (pays USDC fee)
@@ -63,9 +71,10 @@ pub mod solarun_temp {
         event_id: String,
         chip_uid: String,
         checkpoint_id: u8,
+        finish_position: u8,
         timestamp: i64,
     ) -> Result<()> {
-        record_finish::handler(ctx, event_id, chip_uid, checkpoint_id, timestamp)
+        record_finish::handler(ctx, event_id, chip_uid, checkpoint_id, finish_position, timestamp)
     }
 
     /// Process refunds and prize distribution (USDC) for completed event
@@ -76,8 +85,9 @@ pub mod solarun_temp {
         non_finishers: Vec<String>,
         recipient_wallets: Vec<Pubkey>,
         amounts: Vec<u64>,
+        is_final_batch: bool,
     ) -> Result<()> {
-        process_refunds::handler(ctx, event_id, finishers, non_finishers, recipient_wallets, amounts)
+        process_refunds::handler(ctx, event_id, finishers, non_finishers, recipient_wallets, amounts, is_final_batch)
     }
 
     /// Delete an event and return remaining funds
@@ -86,5 +96,14 @@ pub mod solarun_temp {
         event_id: String,
     ) -> Result<()> {
         delete_event::handler(ctx, event_id)
+    }
+
+    /// Close a participant PDA to reclaim rent
+    pub fn close_participant(
+        ctx: Context<CloseParticipant>,
+        event_id: String,
+        chip_uid: String,
+    ) -> Result<()> {
+        close_participant::handler(ctx, event_id, chip_uid)
     }
 }

@@ -126,7 +126,7 @@ export default function CreateEventPage() {
                     max_participants: max,
                     status: 'pending',
                     start_time: startDateTime.toISOString(),
-                    duration_hours: duration,
+                    end_time: endDateTime.toISOString(),
                     creator_wallet: walletAddress,
                     tx_signature: txSignature,
                     vault_address: vaultPda.toBase58(),

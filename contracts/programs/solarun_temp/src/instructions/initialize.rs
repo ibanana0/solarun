@@ -42,7 +42,7 @@ pub struct InitializeEvent<'info> {
 pub fn handler(
     ctx: Context<InitializeEvent>,
     event_id: String,
-    _vault_capacity: u64,
+    max_participants: u32,
     registration_fee: u64,
     start_time: i64,
     end_time: i64,
@@ -65,6 +65,7 @@ pub fn handler(
     event.mint = ctx.accounts.mock_usdc_mint.key();
     event.status = EventStatus::Initialized;
     event.participant_count = 0;
+    event.max_participants = max_participants;
     event.total_deposits = 0;
     event.registration_fee = registration_fee;
     event.start_time = start_time;
@@ -77,6 +78,7 @@ pub fn handler(
         admin: event.admin,
         vault: event.vault,
         mint: event.mint,
+        max_participants,
         start_time,
         end_time,
     });
@@ -91,6 +93,7 @@ pub struct EventInitialized {
     pub admin: Pubkey,
     pub vault: Pubkey,
     pub mint: Pubkey,
+    pub max_participants: u32,
     pub start_time: i64,
     pub end_time: i64,
 }

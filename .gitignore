@@ -4,7 +4,7 @@ solarun_sprint.md
 node_modules/
 *.sql
 ARCHITECTURE.md
-gemini*
-.gemini
+.gemini/
 BUG_REPORT_DELETE_EVENT.md
 admin-keypair.json
+docs/

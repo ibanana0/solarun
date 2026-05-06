@@ -221,7 +221,7 @@ export function Navbar() {
                         </Button>
                     ) : (
                         <div className="flex items-center gap-2">
-                            <div className="flex flex-col items-end mr-2 hidden md:flex">
+                            <div className="flex flex-col items-end mr-2">
                                 <span className="text-[10px] uppercase text-muted-foreground font-bold leading-none">Balance</span>
                                 <div className="flex gap-2">
                                     <span className="text-xs font-mono">{solBalance.toFixed(3)} SOL</span>

@@ -14,6 +14,143 @@ export type SolarunTemp = {
   },
   "instructions": [
     {
+      "name": "closeParticipant",
+      "docs": [
+        "Close a participant PDA to reclaim rent"
+      ],
+      "discriminator": [
+        192,
+        162,
+        92,
+        5,
+        148,
+        191,
+        207,
+        151
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "eventId"
+              }
+            ]
+          }
+        },
+        {
+          "name": "participant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  116,
+                  105,
+                  99,
+                  105,
+                  112,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              },
+              {
+                "kind": "arg",
+                "path": "chipUid"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "eventId",
+          "type": "string"
+        },
+        {
+          "name": "chipUid",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "completeRace",
+      "docs": [
+        "Complete a race (transition from Active to Completed)"
+      ],
+      "discriminator": [
+        251,
+        40,
+        105,
+        128,
+        3,
+        79,
+        193,
+        69
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "eventId"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "eventId",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "createMockMint",
       "docs": [
         "Create the global Mock USDC mint (one-time setup)"
@@ -275,8 +412,8 @@ export type SolarunTemp = {
           "type": "string"
         },
         {
-          "name": "vaultCapacity",
-          "type": "u64"
+          "name": "maxParticipants",
+          "type": "u32"
         },
         {
           "name": "registrationFee",
@@ -581,6 +718,10 @@ export type SolarunTemp = {
           "type": {
             "vec": "u64"
           }
+        },
+        {
+          "name": "isFinalBatch",
+          "type": "bool"
         }
       ]
     },
@@ -671,6 +812,10 @@ export type SolarunTemp = {
         },
         {
           "name": "checkpointId",
+          "type": "u8"
+        },
+        {
+          "name": "finishPosition",
           "type": "u8"
         },
         {
@@ -819,19 +964,19 @@ export type SolarunTemp = {
       ]
     },
     {
-      "name": "startEvent",
+      "name": "startRace",
       "docs": [
-        "Start an event (transition from Initialized to Active)"
+        "Start a race (transition from Initialized to Active)"
       ],
       "discriminator": [
-        61,
-        196,
-        227,
-        97,
-        8,
-        81,
-        107,
-        23
+        167,
+        209,
+        181,
+        53,
+        90,
+        108,
+        220,
+        120
       ],
       "accounts": [
         {
@@ -939,19 +1084,6 @@ export type SolarunTemp = {
       ]
     },
     {
-      "name": "eventStarted",
-      "discriminator": [
-        157,
-        79,
-        42,
-        136,
-        217,
-        220,
-        219,
-        3
-      ]
-    },
-    {
       "name": "participantRegistered",
       "discriminator": [
         47,
@@ -1027,7 +1159,7 @@ export type SolarunTemp = {
     {
       "code": 6009,
       "name": "maxParticipantsReached",
-      "msg": "E0015: Maximum participants reached for this event"
+      "msg": "Maximum participants reached"
     },
     {
       "code": 6010,
@@ -1113,6 +1245,21 @@ export type SolarunTemp = {
       "code": 6026,
       "name": "invalidWalletFormat",
       "msg": "E0052: Invalid wallet address format"
+    },
+    {
+      "code": 6027,
+      "name": "eventNotInitialized",
+      "msg": "Event must be in Initialized status to register"
+    },
+    {
+      "code": 6028,
+      "name": "eventNotActiveForFinish",
+      "msg": "Event must be in Active status to record finish"
+    },
+    {
+      "code": 6029,
+      "name": "eventNotCompletedForRefund",
+      "msg": "Event must be in Completed status to process refunds"
     }
   ],
   "types": [
@@ -1167,6 +1314,10 @@ export type SolarunTemp = {
           },
           {
             "name": "participantCount",
+            "type": "u32"
+          },
+          {
+            "name": "maxParticipants",
             "type": "u32"
           },
           {
@@ -1238,31 +1389,15 @@ export type SolarunTemp = {
             "type": "pubkey"
           },
           {
+            "name": "maxParticipants",
+            "type": "u32"
+          },
+          {
             "name": "startTime",
             "type": "i64"
           },
           {
             "name": "endTime",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "eventStarted",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "eventId",
-            "type": "string"
-          },
-          {
-            "name": "admin",
-            "type": "pubkey"
-          },
-          {
-            "name": "startTime",
             "type": "i64"
           }
         ]

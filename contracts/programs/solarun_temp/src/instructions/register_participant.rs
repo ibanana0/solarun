@@ -59,9 +59,8 @@ pub fn handler(
         return Err(ErrorCode::EventNotFound.into());
     }
 
-    if event.status != EventStatus::Active && event.status != EventStatus::Initialized {
-        return Err(ErrorCode::EventNotActive.into());
-    }
+    require!(event.status == EventStatus::Initialized, ErrorCode::EventNotInitialized);
+    require!(event.participant_count < event.max_participants, ErrorCode::MaxParticipantsReached);
 
     if chip_uid.is_empty() || chip_uid.len() > 20 {
         return Err(ErrorCode::InvalidChipUid.into());

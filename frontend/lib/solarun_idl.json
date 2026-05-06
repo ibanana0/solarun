@@ -8,9 +8,318 @@
   },
   "instructions": [
     {
+      "name": "close_participant",
+      "docs": [
+        "Close a participant PDA to reclaim rent"
+      ],
+      "discriminator": [
+        192,
+        162,
+        92,
+        5,
+        148,
+        191,
+        207,
+        151
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "event_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "participant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  116,
+                  105,
+                  99,
+                  105,
+                  112,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              },
+              {
+                "kind": "arg",
+                "path": "chip_uid"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "event_id",
+          "type": "string"
+        },
+        {
+          "name": "chip_uid",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "complete_race",
+      "docs": [
+        "Complete a race (transition from Active to Completed)"
+      ],
+      "discriminator": [
+        251,
+        40,
+        105,
+        128,
+        3,
+        79,
+        193,
+        69
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "event_id"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "event_id",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "create_mock_mint",
+      "docs": [
+        "Create the global Mock USDC mint (one-time setup)"
+      ],
+      "discriminator": [
+        186,
+        150,
+        36,
+        212,
+        159,
+        183,
+        46,
+        144
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mock_usdc_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  99,
+                  107,
+                  95,
+                  117,
+                  115,
+                  100,
+                  99,
+                  95,
+                  109,
+                  105,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  105,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "delete_event",
+      "docs": [
+        "Delete an event and return remaining funds"
+      ],
+      "discriminator": [
+        103,
+        111,
+        95,
+        106,
+        232,
+        24,
+        190,
+        84
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "event_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "Vault token account to be closed."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin_token_account",
+          "docs": [
+            "Admin's USDC token account to receive remaining funds."
+          ],
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "event_id",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "initialize_event",
       "docs": [
-        "Initialize a new event with vault"
+        "Initialize a new event with USDC vault"
       ],
       "discriminator": [
         126,
@@ -51,12 +360,44 @@
           }
         },
         {
+          "name": "mock_usdc_mint",
+          "docs": [
+            "The Mock USDC mint (must already exist via create_mock_mint)."
+          ]
+        },
+        {
           "name": "vault",
-          "writable": true
+          "docs": [
+            "Vault token account: holds USDC deposits for this event.",
+            "Authority is the event PDA so the program can transfer out via PDA signing."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
         },
         {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
       "args": [
@@ -65,8 +406,8 @@
           "type": "string"
         },
         {
-          "name": "vault_capacity",
-          "type": "u64"
+          "name": "max_participants",
+          "type": "u32"
         },
         {
           "name": "registration_fee",
@@ -83,9 +424,193 @@
       ]
     },
     {
+      "name": "mint_mock_usdc",
+      "docs": [
+        "Faucet: mint Mock USDC to a user's token account"
+      ],
+      "discriminator": [
+        168,
+        64,
+        97,
+        102,
+        69,
+        152,
+        108,
+        251
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mock_usdc_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  99,
+                  107,
+                  95,
+                  117,
+                  115,
+                  100,
+                  99,
+                  95,
+                  109,
+                  105,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  105,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "user"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mock_usdc_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "process_refunds",
       "docs": [
-        "Process refunds and prize distribution for completed event"
+        "Process refunds and prize distribution (USDC) for completed event"
       ],
       "discriminator": [
         48,
@@ -127,11 +652,32 @@
         },
         {
           "name": "vault",
-          "writable": true
+          "docs": [
+            "Vault token account holding deposited USDC."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
       "args": [
@@ -166,6 +712,10 @@
           "type": {
             "vec": "u64"
           }
+        },
+        {
+          "name": "is_final_batch",
+          "type": "bool"
         }
       ]
     },
@@ -259,6 +809,10 @@
           "type": "u8"
         },
         {
+          "name": "finish_position",
+          "type": "u8"
+        },
+        {
           "name": "timestamp",
           "type": "i64"
         }
@@ -267,7 +821,7 @@
     {
       "name": "register_participant",
       "docs": [
-        "Register a participant for an event"
+        "Register a participant for an event (pays USDC fee)"
       ],
       "discriminator": [
         248,
@@ -281,7 +835,7 @@
       ],
       "accounts": [
         {
-          "name": "admin",
+          "name": "runner",
           "writable": true,
           "signer": true
         },
@@ -340,8 +894,44 @@
           }
         },
         {
+          "name": "runner_token_account",
+          "docs": [
+            "Runner's USDC token account (source of registration fee)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "Vault token account (destination of registration fee)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        },
+        {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
       "args": [
@@ -368,19 +958,19 @@
       ]
     },
     {
-      "name": "start_event",
+      "name": "start_race",
       "docs": [
-        "Start an event (transition from Initialized to Active)"
+        "Start a race (transition from Initialized to Active)"
       ],
       "discriminator": [
-        61,
-        196,
-        227,
-        97,
-        8,
-        81,
-        107,
-        23
+        167,
+        209,
+        181,
+        53,
+        90,
+        108,
+        220,
+        120
       ],
       "accounts": [
         {
@@ -462,6 +1052,19 @@
       ]
     },
     {
+      "name": "EventDeleted",
+      "discriminator": [
+        140,
+        28,
+        249,
+        192,
+        46,
+        170,
+        15,
+        241
+      ]
+    },
+    {
       "name": "EventInitialized",
       "discriminator": [
         197,
@@ -472,19 +1075,6 @@
         160,
         192,
         234
-      ]
-    },
-    {
-      "name": "EventStarted",
-      "discriminator": [
-        157,
-        79,
-        42,
-        136,
-        217,
-        220,
-        219,
-        3
       ]
     },
     {
@@ -563,7 +1153,7 @@
     {
       "code": 6009,
       "name": "MaxParticipantsReached",
-      "msg": "E0015: Maximum participants reached for this event"
+      "msg": "Maximum participants reached"
     },
     {
       "code": 6010,
@@ -649,6 +1239,21 @@
       "code": 6026,
       "name": "InvalidWalletFormat",
       "msg": "E0052: Invalid wallet address format"
+    },
+    {
+      "code": 6027,
+      "name": "EventNotInitialized",
+      "msg": "Event must be in Initialized status to register"
+    },
+    {
+      "code": 6028,
+      "name": "EventNotActiveForFinish",
+      "msg": "Event must be in Active status to record finish"
+    },
+    {
+      "code": 6029,
+      "name": "EventNotCompletedForRefund",
+      "msg": "Event must be in Completed status to process refunds"
     }
   ],
   "types": [
@@ -690,6 +1295,10 @@
             "type": "pubkey"
           },
           {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
             "name": "status",
             "type": {
               "defined": {
@@ -702,7 +1311,15 @@
             "type": "u32"
           },
           {
+            "name": "max_participants",
+            "type": "u32"
+          },
+          {
             "name": "total_deposits",
+            "type": "u64"
+          },
+          {
+            "name": "registration_fee",
             "type": "u64"
           },
           {
@@ -716,6 +1333,30 @@
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "vault_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EventDeleted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event_id",
+            "type": "string"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "remaining_returned",
+            "type": "u64"
           }
         ]
       }
@@ -738,31 +1379,19 @@
             "type": "pubkey"
           },
           {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "max_participants",
+            "type": "u32"
+          },
+          {
             "name": "start_time",
             "type": "i64"
           },
           {
             "name": "end_time",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "EventStarted",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "event_id",
-            "type": "string"
-          },
-          {
-            "name": "admin",
-            "type": "pubkey"
-          },
-          {
-            "name": "start_time",
             "type": "i64"
           }
         ]
@@ -872,6 +1501,10 @@
           {
             "name": "chip_uid",
             "type": "string"
+          },
+          {
+            "name": "fee_paid",
+            "type": "u64"
           }
         ]
       }
