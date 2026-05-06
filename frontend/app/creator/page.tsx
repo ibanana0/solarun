@@ -96,7 +96,8 @@ function EventRow({ event, onEventDeleted }: { event: RaceEvent; onEventDeleted?
                         size="sm"
                         className="text-destructive hover:text-destructive hover:bg-destructive/10"
                         onClick={handleDeleteEvent}
-                        disabled={isDeleting}
+                        disabled={isDeleting || event.status === 'active'}
+                        title={event.status === 'active' ? "Event sedang aktif tidak bisa dihapus" : "Hapus Event"}
                     >
                         {isDeleting ? (
                             <Loader2 className="h-4 w-4 animate-spin" />

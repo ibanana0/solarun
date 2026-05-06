@@ -40,7 +40,15 @@ export async function deleteEventWithRefund(eventId: string) {
         console.log(`   📋 Event found: ${event.name} (status: ${event.status})`);
         console.log(`   📋 Vault found: ${event.vault_address}`);
 
-        // ── Step 2: Check if event can be deleted (only non-settled events) ──
+        // ── Step 2: Check if event can be deleted (only pending or completed events) ──
+        // - "pending": Can be deleted, vault USDC returned to admin.
+        // - "completed": Can be deleted, participants refunded via processRefunds first.
+        // - "active": BLOCKED. Cannot delete while race is in progress.
+        // - "settled": BLOCKED. Already finalized, records should be kept for audit.
+        if (event.status === 'active') {
+            throw new Error(`Cannot delete an active event. Please complete or stop the race first.`);
+        }
+
         if (event.status === 'settled') {
             throw new Error(`Cannot delete settled events. Event ID: ${eventId}`);
         }
@@ -122,13 +130,6 @@ export async function deleteEventWithRefund(eventId: string) {
                     // delete_event will return all vault USDC to admin directly
                     console.log(`   ℹ️  Event is pending (Initialized). Skipping processRefunds.`);
                     console.log(`      Vault funds will be returned to admin via delete_event.`);
-                } else if (onChainStatus === 'active') {
-                    // ── ACTIVE EVENT: Cannot delete on-chain directly ──
-                    // Smart contract requires Initialized or Settled for delete_event
-                    // We'll skip on-chain operations and just clean up the database
-                    console.warn(`   ⚠️  Event is active. Smart contract doesn't allow deleting active events.`);
-                    console.warn(`      Skipping on-chain operations. Database will be cleaned up.`);
-                    console.warn(`      ⚠️  Note: On-chain vault funds may remain locked until event is completed.`);
                 }
 
                 // ── Call delete_event for pending/completed(settled) events ──
