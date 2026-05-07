@@ -7,8 +7,8 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { StatusBadge } from '@/components/StatusBadge';
-import { Trophy } from 'lucide-react';
-import type { Runner } from '@/lib/supabase';
+import { Trophy, Clock } from 'lucide-react';
+import type { RunnerWithLogs } from '@/hooks/useRunners';
 
 const CHECKPOINT_LABELS: Record<number, string> = {
     0: 'Start',
@@ -17,8 +17,15 @@ const CHECKPOINT_LABELS: Record<number, string> = {
 };
 
 interface LeaderboardTableProps {
-    runners: Runner[];
+    runners: RunnerWithLogs[];
     isLoading: boolean;
+}
+
+function formatTimeOnly(dateStr: string | null) {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleTimeString('id-ID', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
 }
 
 export function LeaderboardTable({ runners, isLoading }: LeaderboardTableProps) {
@@ -40,10 +47,23 @@ export function LeaderboardTable({ runners, isLoading }: LeaderboardTableProps) 
     }
 
     const sorted = [...runners].sort((a, b) => {
+        // 1. Finished runners first, sorted by position
         if (a.finish_position !== null && b.finish_position !== null)
             return a.finish_position - b.finish_position;
         if (a.finish_position !== null) return -1;
         if (b.finish_position !== null) return 1;
+        
+        // 2. Then sort by checkpoint (higher is better)
+        if (a.last_checkpoint_id !== b.last_checkpoint_id) {
+            return b.last_checkpoint_id - a.last_checkpoint_id;
+        }
+
+        // 3. If at the same checkpoint, sort by time (earlier is better)
+        if (a.last_checkpoint_time && b.last_checkpoint_time) {
+            return new Date(a.last_checkpoint_time).getTime() - new Date(b.last_checkpoint_time).getTime();
+        }
+
+        // Fallbacks
         if (a.status === 'running' && b.status !== 'running') return -1;
         if (b.status === 'running' && a.status !== 'running') return 1;
         return 0;
@@ -58,6 +78,7 @@ export function LeaderboardTable({ runners, isLoading }: LeaderboardTableProps) 
                         <TableHead>Nama Peserta</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Checkpoint</TableHead>
+                        <TableHead>Waktu (Real)</TableHead>
                         <TableHead>Wallet</TableHead>
                         <TableHead className="text-right">On-Chain Tx</TableHead>
                     </TableRow>
@@ -86,12 +107,14 @@ export function LeaderboardTable({ runners, isLoading }: LeaderboardTableProps) 
                                 <TableCell>
                                     <StatusBadge status={runner.status} />
                                 </TableCell>
-                                <TableCell className="text-muted-foreground text-sm">
-                                    {runner.status === 'registered'
-                                        ? '—'
-                                        : runner.status === 'finished'
-                                            ? CHECKPOINT_LABELS[2]
-                                            : CHECKPOINT_LABELS[1] ?? '—'}
+                                <TableCell className="font-medium text-sm">
+                                    {runner.last_checkpoint_id >= 0 
+                                        ? CHECKPOINT_LABELS[runner.last_checkpoint_id] || `CP${runner.last_checkpoint_id}`
+                                        : '—'}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground text-sm font-mono flex items-center gap-1.5 mt-2.5">
+                                    {runner.last_checkpoint_time && <Clock className="h-3 w-3 opacity-50" />}
+                                    {formatTimeOnly(runner.last_checkpoint_time)}
                                 </TableCell>
                                 <TableCell className="font-mono text-xs text-muted-foreground">
                                     {runner.wallet_address.slice(0, 6)}...{runner.wallet_address.slice(-4)}

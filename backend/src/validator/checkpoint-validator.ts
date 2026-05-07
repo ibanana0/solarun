@@ -16,7 +16,7 @@ import { supabase } from '../lib/supabase';
 export interface CheckpointMessage {
     rfid_uid: string;
     checkpoint_id: number;
-    timestamp: string; // ISO 8601
+    timestamp: string | number; // ISO 8601 string or epoch ms
     event_id?: string; // optional, defaults to active event
 }
 
@@ -46,7 +46,11 @@ const CHECKPOINT_FINISH = 2;
  * Returns a ValidationResult indicating success or failure with reason.
  */
 export async function validateCheckpoint(msg: CheckpointMessage): Promise<ValidationResult> {
-    const { rfid_uid, checkpoint_id, timestamp } = msg;
+    const { rfid_uid, checkpoint_id } = msg;
+    // Normalize timestamp: accept both epoch ms (number) and ISO string
+    const timestamp = typeof msg.timestamp === 'number'
+        ? new Date(msg.timestamp).toISOString()
+        : msg.timestamp;
 
     // --- Input validation ---
     if (!rfid_uid || rfid_uid.trim() === '') {
@@ -64,17 +68,27 @@ export async function validateCheckpoint(msg: CheckpointMessage): Promise<Valida
         return { valid: false, error: 'Missing timestamp' };
     }
 
-    // --- Find runner by chip_uid ---
-    const { data: runner, error: runnerError } = await supabase
+    // --- Find runner by chip_uid and event_id ---
+    let query = supabase
         .from('runners')
         .select('id, status, chip_uid, event_id, finish_position')
-        .eq('chip_uid', rfid_uid)
-        .maybeSingle();
+        .eq('chip_uid', rfid_uid);
+
+    if (msg.event_id) {
+        query = query.eq('event_id', msg.event_id);
+    } else {
+        // Fallback: If sensor doesn't provide event_id, assume the latest registration
+        query = query.order('created_at', { ascending: false });
+    }
+
+    const { data: runnersArray, error: runnerError } = await query.limit(1);
 
     if (runnerError) {
         console.error('[Validator] DB error querying runner:', runnerError.message);
         return { valid: false, error: `Database error: ${runnerError.message}` };
     }
+
+    const runner = runnersArray && runnersArray.length > 0 ? runnersArray[0] : null;
 
     if (!runner) {
         return { valid: false, error: `Runner not found for chip_uid: ${rfid_uid}` };
@@ -241,16 +255,6 @@ async function recordCheckpoint(
     }
 
     if (isFinish) {
-        // Optimistic UI: Mark as finishing while we process
-        const now = new Date().toISOString();
-        await supabase
-            .from('runners')
-            .update({ 
-                status: 'Finishing...',
-                processing_started_at: now
-            })
-            .eq('id', runnerId);
-
         // Auto-assign finish_position based on how many have already finished in this event
         const { count, error: countError } = await supabase
             .from('runners')
@@ -270,7 +274,6 @@ async function recordCheckpoint(
             .update({
                 status: 'finished',
                 finish_position: finishPosition,
-                processing_started_at: null, // Clear the processing timestamp
             })
             .eq('id', runnerId);
 

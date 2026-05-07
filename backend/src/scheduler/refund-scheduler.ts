@@ -43,25 +43,30 @@ export function resetProcessedEvents() {
 }
 
 /**
- * Check if a runner has already been paid/processed for an event
+ * Check if a runner has already been paid/processed for an event (via prize distribution)
+ * 
+ * BUGFIX: Checks prize_tx_signature (from processRefunds), NOT tx_signature 
+ * (which is from record_finish checkpoint). This is the correct source of truth 
+ * for whether a runner has received their prize.
+ * 
  * @param runnerId - Runner ID
- * @returns true if confirmed on-chain
+ * @returns true if prize distribution confirmed on-chain
  */
 async function isRunnerPaid(runnerId: string): Promise<boolean> {
     const { data } = await supabase
         .from('runners')
-        .select('tx_signature')
+        .select('prize_tx_signature')
         .eq('id', runnerId)
         .single();
     
-    if (data?.tx_signature) {
+    if (data?.prize_tx_signature) {
         try {
             const conn = getConnection();
-            const status = await conn.getSignatureStatus(data.tx_signature);
+            const status = await conn.getSignatureStatus(data.prize_tx_signature);
             // If signature exists and is finalized, they are paid
             return status.value?.confirmationStatus === 'finalized';
         } catch (e) {
-            console.warn(`      ⚠️  Failed to check signature status for ${runnerId}:`, e);
+            console.warn(`      ⚠️  Failed to check prize signature status for ${runnerId}:`, e);
             return false;
         }
     }
@@ -299,16 +304,18 @@ async function markEventSettled(eventId: string) {
 }
 
 /**
- * Update multiple runners with their transaction signature
+ * Update multiple runners with their prize distribution transaction signature
+ * This is used for idempotency checking - to know which runners were included
+ * in which prize distribution batch.
  */
 async function updateRunnersTxSignature(runnerIds: string[], txSignature: string) {
     const { error } = await supabase
         .from('runners')
-        .update({ tx_signature: txSignature })
+        .update({ prize_tx_signature: txSignature })
         .in('id', runnerIds);
 
     if (error) {
-        console.error(`   ❌ Failed to update runners with tx signature:`, error);
+        console.error(`   ❌ Failed to update runners with prize tx signature:`, error);
     }
 }
 

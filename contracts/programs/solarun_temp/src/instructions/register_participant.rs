@@ -85,6 +85,8 @@ pub fn handler(
     participant.full_name = full_name;
     participant.finish_position = None;
     participant.status = ParticipantStatus::Registered;
+    participant.last_checkpoint = 0;
+    participant.last_checkpoint_at = 0;
     participant.registered_at = Clock::get()?.unix_timestamp;
     participant.finished_at = None;
     participant.bump = ctx.bumps.participant;

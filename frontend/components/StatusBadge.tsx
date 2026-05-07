@@ -5,17 +5,17 @@ type EventStatus = 'pending' | 'active' | 'completed' | 'settled' | 'Initialized
 type Status = RunnerStatus | EventStatus;
 
 const STATUS_LABEL: Record<Status, string> = {
-    registered:    'Terdaftar',
-    running:       'Berlari',
-    finished:      'Selesai',
-    disqualified:  'Diskualifikasi',
-    pending:       'Belum Mulai',
-    active:        'Aktif',
-    completed:     'Selesai',
+    registered:    'Registered',
+    running:       'Running',
+    finished:      'Finished',
+    disqualified:  'Disqualified (DNF)',
+    pending:       'Pending',
+    active:        'Active',
+    completed:     'Completed',
     settled:       'Settled',
-    Initialized:   'Terinisialisasi',
-    Active:        'Aktif',
-    Completed:     'Selesai',
+    Initialized:   'Initialized',
+    Active:        'Active',
+    Completed:     'Completed',
     Settled:       'Settled',
 };
 

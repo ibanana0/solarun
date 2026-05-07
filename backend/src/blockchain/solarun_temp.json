@@ -1273,6 +1273,10 @@
           {
             "name": "checkpoint_id",
             "type": "u8"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }
@@ -1467,6 +1471,14 @@
                 "name": "ParticipantStatus"
               }
             }
+          },
+          {
+            "name": "last_checkpoint",
+            "type": "u8"
+          },
+          {
+            "name": "last_checkpoint_at",
+            "type": "i64"
           },
           {
             "name": "registered_at",

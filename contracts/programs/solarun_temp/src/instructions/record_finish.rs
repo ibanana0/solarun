@@ -33,7 +33,7 @@ pub fn handler(
     chip_uid: String,
     checkpoint_id: u8,
     finish_position: u8,
-    _timestamp: i64,
+    timestamp: i64,
 ) -> Result<()> {
     let event = &ctx.accounts.event;
 
@@ -54,13 +54,19 @@ pub fn handler(
         return Err(ErrorCode::ParticipantNotFound.into());
     }
 
+    // Record the precise IoT timestamp and checkpoint
+    participant.last_checkpoint = checkpoint_id;
+    participant.last_checkpoint_at = timestamp;
+
     match checkpoint_id {
         0 => {
             participant.status = ParticipantStatus::Running;
-            msg!("Participant {} started", chip_uid);
+            msg!("Participant {} started at {}", chip_uid, timestamp);
         }
         1 => {
-            msg!("Participant {} passed checkpoint 1", chip_uid);
+            // Even though status is still "Running", the last_checkpoint will reflect CP1
+            participant.status = ParticipantStatus::Running;
+            msg!("Participant {} passed checkpoint 1 at {}", chip_uid, timestamp);
         }
         2 => {
             if participant.status == ParticipantStatus::Finished {
@@ -68,11 +74,10 @@ pub fn handler(
             }
 
             participant.status = ParticipantStatus::Finished;
-            participant.finished_at = Some(Clock::get()?.unix_timestamp);
-
+            participant.finished_at = Some(timestamp);
             participant.finish_position = Some(finish_position);
 
-            msg!("Participant {} finished at position {}", chip_uid, finish_position);
+            msg!("Participant {} finished at position {} at {}", chip_uid, finish_position, timestamp);
         }
         _ => {
             return Err(ErrorCode::InvalidCheckpointId.into());
@@ -83,6 +88,7 @@ pub fn handler(
         event_id: event_id.clone(),
         chip_uid: chip_uid.clone(),
         checkpoint_id,
+        timestamp,
     });
 
     Ok(())
@@ -93,4 +99,5 @@ pub struct CheckpointRecorded {
     pub event_id: String,
     pub chip_uid: String,
     pub checkpoint_id: u8,
+    pub timestamp: i64,
 }

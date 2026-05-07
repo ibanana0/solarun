@@ -89,24 +89,25 @@ export async function deleteEventWithRefund(eventId: string) {
 
                 const onChainStatus = event.status; // pending | active | completed | settled
 
-                if (onChainStatus === 'completed' && participantCount > 0) {
+                if (onChainStatus === 'completed') {
                     // ── COMPLETED EVENT: Process refunds first, then delete ──
-                    console.log(`   ⛓️  Event is completed. Processing refunds before deletion...`);
+                    // We must call processRefunds even if participants = 0 
+                    // to transition the on-chain status from Completed to Settled.
+                    console.log(`   ⛓️  Event is completed. Processing refunds before deletion (transition to Settled)...`);
 
-                    const nonFinishers = participants!.map((p: any) => p.chip_uid);
-                    const wallets = participants!.map((p: any) => new PublicKey(p.wallet_address));
+                    const nonFinishers = participants ? participants.map((p: any) => p.chip_uid) : [];
+                    const wallets = participants ? participants.map((p: any) => new PublicKey(p.wallet_address)) : [];
 
                     const MOCK_USDC_DECIMALS = 6;
                     const feeDisplayValue = event.registration_fee_sol || 10;
                     const refundAmountPerRunner = new anchor.BN(
                         Math.round(feeDisplayValue * Math.pow(10, MOCK_USDC_DECIMALS))
                     );
-                    const amounts = participants!.map(() => refundAmountPerRunner);
+                    const amounts = participants ? participants.map(() => refundAmountPerRunner) : [];
 
                     console.log(`   📊 Refund Details:`);
                     console.log(`      - Participants: ${wallets.length}`);
                     console.log(`      - Fee (display): ${feeDisplayValue} USDC`);
-                    console.log(`      - Amount per runner: ${refundAmountPerRunner.toString()} raw units`);
                     console.log(`      - Vault: ${event.vault_address}`);
                     console.log(`      - Admin signing: ${adminKeypair.publicKey.toBase58()}`);
 

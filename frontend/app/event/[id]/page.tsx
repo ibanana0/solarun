@@ -2,7 +2,7 @@
 
 import { use, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Users, Trophy, Clock, Wallet, Loader2, PlayCircle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Users, Trophy, Clock, Wallet, Loader2, PlayCircle, CheckCircle2, Copy, Check } from 'lucide-react';
 import { useEvent } from '@/hooks/useEvent';
 import { useRunners } from '@/hooks/useRunners';
 import { useAuth } from '@/hooks/useAuth';
@@ -36,6 +36,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
 
     const [isStarting, setIsStarting] = useState(false);
     const [isFinalizing, setIsFinalizing] = useState(false);
+    const [isCopied, setIsCopied] = useState(false);
 
     const isCreator = walletAddress === event?.creator_wallet;
 
@@ -73,6 +74,30 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
         } catch (error: any) {
             console.error("Failed to start race:", error);
             let msg = error.message || String(error);
+            
+            // --- Fallback check for RPC Timeout ---
+            if (msg.includes('was not confirmed in 30.00 seconds')) {
+                try {
+                    console.log("Checking on-chain status after timeout...");
+                    const cleanEventId = event.id.replace(/-/g, '');
+                    const [eventPda] = PublicKey.findProgramAddressSync(
+                        [Buffer.from('event'), Buffer.from(cleanEventId)],
+                        program.programId
+                    );
+                    const onChainData = await program.account.event.fetch(eventPda);
+                    
+                    if (onChainData.status.active || onChainData.status.completed || onChainData.status.settled) {
+                        console.log("Transaction actually succeeded on-chain!");
+                        await supabase.from('race_events').update({ status: 'active' }).eq('id', event.id);
+                        alert(`✅ Race berhasil dimulai (Berhasil di-recover dari timeout jaringan)!\n\nMohon tunggu sesaat, tampilan akan di-refresh.`);
+                        refetchEvent();
+                        return;
+                    }
+                } catch (fallbackErr) {
+                    console.error("Fallback check failed:", fallbackErr);
+                }
+            }
+
             if (msg.includes('Custom: 2006')) {
                 msg = "Data event tidak kompatibel (Error 2006). Kemungkinan event ini dibuat dengan versi contract lama. Silakan buat event baru.";
             }
@@ -107,13 +132,50 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                 
             console.log("Race completed on-chain:", txSignature);
 
-            // 2. Update Supabase
+            // 2. Update Supabase Event Status
             await supabase.from('race_events').update({ status: 'completed' }).eq('id', event.id);
-            alert(`✅ Event berhasil difinalisasi!\nSistem akan mulai membagikan hadiah.\n\nTX: ${txSignature}`);
+
+            // 3. Mark non-finishers as disqualified (DNF)
+            await supabase.from('runners')
+                .update({ status: 'disqualified' })
+                .eq('event_id', event.id)
+                .neq('status', 'finished');
+
+            alert(`✅ Event berhasil difinalisasi!\nPeserta yang belum finish telah dinyatakan DNF.\nSistem akan mulai membagikan hadiah.\n\nTX: ${txSignature}`);
             refetchEvent();
         } catch (error: any) {
             console.error("Failed to finalize race:", error);
             let msg = error.message || String(error);
+
+            // --- Fallback check for RPC Timeout ---
+            if (msg.includes('was not confirmed in 30.00 seconds')) {
+                try {
+                    console.log("Checking on-chain status after timeout...");
+                    const cleanEventId = event.id.replace(/-/g, '');
+                    const [eventPda] = PublicKey.findProgramAddressSync(
+                        [Buffer.from('event'), Buffer.from(cleanEventId)],
+                        program.programId
+                    );
+                    const onChainData = await program.account.event.fetch(eventPda);
+                    
+                    if (onChainData.status.completed || onChainData.status.settled) {
+                        console.log("Transaction actually succeeded on-chain!");
+                        await supabase.from('race_events').update({ status: 'completed' }).eq('id', event.id);
+                        
+                        await supabase.from('runners')
+                            .update({ status: 'disqualified' })
+                            .eq('event_id', event.id)
+                            .neq('status', 'finished');
+
+                        alert(`✅ Event berhasil difinalisasi (Berhasil di-recover dari timeout jaringan)!\nSistem akan mulai membagikan hadiah.`);
+                        refetchEvent();
+                        return;
+                    }
+                } catch (fallbackErr) {
+                    console.error("Fallback check failed:", fallbackErr);
+                }
+            }
+
             if (msg.includes('Custom: 2006')) {
                 msg = "Data event tidak kompatibel (Error 2006). Kemungkinan event ini dibuat dengan versi contract lama. Silakan buat event baru.";
             }
@@ -170,7 +232,22 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                         </span>
                     )}
                 </div>
-                <h1 className="text-3xl font-bold tracking-tight">{event.name}</h1>
+                <div className="flex items-center gap-3">
+                    <h1 className="text-3xl font-bold tracking-tight">{event.name}</h1>
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 text-xs flex items-center gap-1"
+                        onClick={() => {
+                            navigator.clipboard.writeText(event.id);
+                            setIsCopied(true);
+                            setTimeout(() => setIsCopied(false), 2000);
+                        }}
+                    >
+                        {isCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                        {isCopied ? "Tersalin!" : "Copy Event ID"}
+                    </Button>
+                </div>
                 {event.tx_signature && (
                     <a
                         href={`https://explorer.solana.com/tx/${event.tx_signature}?cluster=devnet`}
@@ -210,7 +287,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5">
                 <Card>
                     <CardHeader className="pb-2">
                         <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
@@ -252,6 +329,18 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                     </CardHeader>
                     <CardContent>
                         <p className="text-sm font-medium leading-tight">{formatDate(event.start_time)}</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                            <Clock className="h-3 w-3" /> Selesai
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm font-medium leading-tight text-destructive">
+                            {formatDate(event.end_time)}
+                        </p>
                     </CardContent>
                 </Card>
             </div>

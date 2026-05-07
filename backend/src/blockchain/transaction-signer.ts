@@ -475,6 +475,177 @@ export async function buildCloseParticipantInstruction(
 }
 
 // ============================================================================
+// Record Finish (Checkpoint) On-Chain
+// ============================================================================
+
+const TX_CONFIRM_TIMEOUT_MS = 60_000; // 60s instead of default 30s
+const TX_MAX_RETRIES = 3;
+
+/**
+ * Small delay utility for sequential processing.
+ */
+function delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Call the smart contract's record_finish instruction.
+ * This records checkpoint progress (start/mid/finish) on-chain.
+ * 
+ * Uses skipPreflight + manual confirmation polling to survive Devnet
+ * congestion and avoid the default 30-second timeout.
+ * 
+ * The backend (admin) is the signer — the smart contract verifies
+ * that backend.key() == event.admin.
+ */
+export async function recordFinishOnChain(
+    eventId: string,
+    chipUid: string,
+    checkpointId: number,
+    finishPosition: number,
+    timestamp: number,
+): Promise<string> {
+    const cleanEventId = eventId.replace(/-/g, '');
+    const programId = process.env.SOLARUN_PROGRAM_ID;
+    if (!programId) throw new Error('SOLARUN_PROGRAM_ID not set');
+
+    const admin = getAdminKeypair();
+    const connection = getConnection();
+    const provider = new anchor.AnchorProvider(
+        connection,
+        new anchor.Wallet(admin),
+        { commitment: 'confirmed', skipPreflight: true }
+    );
+
+    const program = new Program(
+        { ...idl, address: programId } as Idl,
+        provider
+    );
+
+    const [eventPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("event"), Buffer.from(cleanEventId)],
+        program.programId
+    );
+
+    const [participantPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(chipUid)],
+        program.programId
+    );
+
+    console.log(`[Blockchain] 📡 Calling record_finish on-chain...`);
+    console.log(`   Event: ${cleanEventId}, Chip: ${chipUid}, CP: ${checkpointId}, Pos: ${finishPosition}`);
+
+    // Build the transaction instruction manually for retry control
+    const instruction = await (program.methods as any)
+        .recordFinish(
+            cleanEventId,
+            chipUid,
+            checkpointId,
+            finishPosition,
+            new anchor.BN(timestamp)
+        )
+        .accounts({
+            backend: admin.publicKey,
+            event: eventPda,
+            participant: participantPda,
+        })
+        .instruction();
+
+    // Retry loop
+    for (let attempt = 1; attempt <= TX_MAX_RETRIES; attempt++) {
+        try {
+            // Get a fresh blockhash for each attempt
+            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+
+            const tx = new Transaction();
+            tx.add(instruction);
+            tx.recentBlockhash = blockhash;
+            tx.lastValidBlockHeight = lastValidBlockHeight;
+            tx.feePayer = admin.publicKey;
+            tx.sign(admin);
+
+            // Send with skipPreflight to avoid simulation timeout
+            const rawTx = tx.serialize();
+            const txSig = await connection.sendRawTransaction(rawTx, {
+                skipPreflight: true,
+                maxRetries: 2,
+            });
+
+            console.log(`[Blockchain]    Attempt ${attempt}/${TX_MAX_RETRIES} — TX sent: ${txSig.slice(0, 20)}...`);
+
+            // Wait for confirmation with extended timeout
+            const confirmation = await connection.confirmTransaction(
+                {
+                    signature: txSig,
+                    blockhash,
+                    lastValidBlockHeight,
+                },
+                'confirmed'
+            );
+
+            if (confirmation.value.err) {
+                console.error(`[Blockchain] ❌ TX confirmed but failed on-chain:`, confirmation.value.err);
+                throw new Error(`Transaction confirmed with error: ${JSON.stringify(confirmation.value.err)}`);
+            }
+
+            console.log(`[Blockchain] ✅ record_finish confirmed! TX: ${txSig}`);
+            return txSig;
+
+        } catch (err: any) {
+            const isTimeout = err.message?.includes('was not confirmed') || 
+                              err.message?.includes('block height exceeded');
+            
+            if (isTimeout && attempt < TX_MAX_RETRIES) {
+                console.warn(`[Blockchain] ⏳ Attempt ${attempt} timed out. Retrying in 2s...`);
+                await delay(2000);
+                continue;
+            }
+
+            // Final attempt failed or non-timeout error
+            throw err;
+        }
+    }
+
+    throw new Error('record_finish: All retry attempts exhausted');
+}
+
+/**
+ * Fetch a single participant's on-chain data by event ID and chip UID.
+ */
+export async function getParticipantOnChain(eventId: string, chipUid: string): Promise<any | null> {
+    const cleanEventId = eventId.replace(/-/g, '');
+    const programId = process.env.SOLARUN_PROGRAM_ID;
+    if (!programId) throw new Error('SOLARUN_PROGRAM_ID not set');
+
+    const provider = new anchor.AnchorProvider(
+        getConnection(),
+        new anchor.Wallet(getAdminKeypair()),
+        { commitment: 'confirmed' }
+    );
+
+    const program = new Program(
+        { ...idl, address: programId } as Idl,
+        provider
+    );
+
+    const [eventPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("event"), Buffer.from(cleanEventId)],
+        program.programId
+    );
+
+    const [participantPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(chipUid)],
+        program.programId
+    );
+
+    try {
+        return await program.account.participant.fetch(participantPda);
+    } catch {
+        return null;
+    }
+}
+
+// ============================================================================
 // Debug / Testing
 // ============================================================================
 

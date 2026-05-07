@@ -52,6 +52,8 @@ pub struct Participant {
     pub full_name: String,                  // Name, max 50 chars
     pub finish_position: Option<u8>,        // 1, 2, 3, 4, ... or None
     pub status: ParticipantStatus,          // Registered, Running, Finished, etc
+    pub last_checkpoint: u8,                // 0=Start, 1=CP1, 2=Finish
+    pub last_checkpoint_at: i64,            // Precise IoT timestamp
     pub registered_at: i64,                 // Unix timestamp
     pub finished_at: Option<i64>,           // Unix timestamp or None
     pub bump: u8,                           // PDA bump seed
