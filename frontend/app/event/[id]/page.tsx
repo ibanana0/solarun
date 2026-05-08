@@ -2,7 +2,7 @@
 
 import { use, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Users, Trophy, Clock, Wallet, Loader2, PlayCircle, CheckCircle2, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Users, Trophy, Clock, Wallet, Loader2, PlayCircle, CheckCircle2, Copy, Check, AlertCircle, Info } from 'lucide-react';
 import { useEvent } from '@/hooks/useEvent';
 import { useRunners } from '@/hooks/useRunners';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,6 +19,16 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleString('id-ID', {
@@ -38,151 +48,187 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
     const [isFinalizing, setIsFinalizing] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
 
+    // Dialog state
+    const [dialog, setDialog] = useState<{
+        open: boolean;
+        title: string;
+        description: string;
+        type: 'success' | 'error' | 'info' | 'warning';
+        onConfirm?: () => void;
+        cancelText?: string;
+        actionText?: string;
+    }>({
+        open: false,
+        title: '',
+        description: '',
+        type: 'info'
+    });
+
+    const showDialog = (title: string, description: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', onConfirm?: () => void, actionText = 'OK', cancelText?: string) => {
+        setDialog({ open: true, title, description, type, onConfirm, actionText, cancelText });
+    };
+
     const isCreator = walletAddress === event?.creator_wallet;
 
     const handleStartRace = async () => {
         if (!program || !event) return;
-        if (!confirm('Apakah Anda yakin ingin memulai perlombaan ini? Sensor RFID akan mulai menerima tap.')) return;
         
-        setIsStarting(true);
-        try {
-            const cleanEventId = event.id.replace(/-/g, '');
-            
-            // Derive Event PDA correctly
-            const [eventPda] = PublicKey.findProgramAddressSync(
-                [Buffer.from('event'), Buffer.from(cleanEventId)],
-                program.programId
-            );
-
-            const txSignature = await program.methods
-                .startRace(cleanEventId)
-                .accounts({
-                    admin: program.provider.publicKey,
-                    event: eventPda,
-                } as any)
-                .rpc();
-                
-            console.log("Race started on-chain:", txSignature);
-            
-            // Update Supabase to match on-chain state
-            await supabase.from('race_events').update({ 
-                status: 'active'
-            }).eq('id', event.id);
-            
-            alert(`✅ Race berhasil dimulai!\n\nTX: ${txSignature}`);
-            refetchEvent();
-        } catch (error: any) {
-            console.error("Failed to start race:", error);
-            let msg = error.message || String(error);
-            
-            // --- Fallback check for RPC Timeout ---
-            if (msg.includes('was not confirmed in 30.00 seconds')) {
+        showDialog(
+            "Konfirmasi Start Race",
+            "Apakah Anda yakin ingin memulai perlombaan ini? Sensor RFID akan mulai menerima tap.",
+            "warning",
+            async () => {
+                setIsStarting(true);
                 try {
-                    console.log("Checking on-chain status after timeout...");
                     const cleanEventId = event.id.replace(/-/g, '');
+                    
+                    // Derive Event PDA correctly
                     const [eventPda] = PublicKey.findProgramAddressSync(
                         [Buffer.from('event'), Buffer.from(cleanEventId)],
                         program.programId
                     );
-                    const onChainData = await program.account.event.fetch(eventPda);
-                    
-                    if (onChainData.status.active || onChainData.status.completed || onChainData.status.settled) {
-                        console.log("Transaction actually succeeded on-chain!");
-                        await supabase.from('race_events').update({ status: 'active' }).eq('id', event.id);
-                        alert(`✅ Race berhasil dimulai (Berhasil di-recover dari timeout jaringan)!\n\nMohon tunggu sesaat, tampilan akan di-refresh.`);
-                        refetchEvent();
-                        return;
-                    }
-                } catch (fallbackErr) {
-                    console.error("Fallback check failed:", fallbackErr);
-                }
-            }
 
-            if (msg.includes('Custom: 2006')) {
-                msg = "Data event tidak kompatibel (Error 2006). Kemungkinan event ini dibuat dengan versi contract lama. Silakan buat event baru.";
-            }
-            alert(`❌ Gagal memulai race: ${msg}`);
-        } finally {
-            setIsStarting(false);
-        }
+                    const txSignature = await program.methods
+                        .startRace(cleanEventId)
+                        .accounts({
+                            admin: program.provider.publicKey,
+                            event: eventPda,
+                        } as any)
+                        .rpc();
+                        
+                    console.log("Race started on-chain:", txSignature);
+                    
+                    // Update Supabase to match on-chain state
+                    await supabase.from('race_events').update({ 
+                        status: 'active'
+                    }).eq('id', event.id);
+                    
+                    showDialog("Berhasil!", `Race berhasil dimulai!\n\nTX: ${txSignature}`, "success");
+                    refetchEvent();
+                } catch (error: any) {
+                    console.error("Failed to start race:", error);
+                    let msg = error.message || String(error);
+                    
+                    // --- Fallback check for RPC Timeout ---
+                    if (msg.includes('was not confirmed in 30.00 seconds')) {
+                        try {
+                            console.log("Checking on-chain status after timeout...");
+                            const cleanEventId = event.id.replace(/-/g, '');
+                            const [eventPda] = PublicKey.findProgramAddressSync(
+                                [Buffer.from('event'), Buffer.from(cleanEventId)],
+                                program.programId
+                            );
+                            const onChainData = await program.account.event.fetch(eventPda);
+                            
+                            if (onChainData.status.active || onChainData.status.completed || onChainData.status.settled) {
+                                console.log("Transaction actually succeeded on-chain!");
+                                await supabase.from('race_events').update({ status: 'active' }).eq('id', event.id);
+                                showDialog("Berhasil!", "Race berhasil dimulai (Berhasil di-recover dari timeout jaringan)!\n\nMohon tunggu sesaat, tampilan akan di-refresh.", "success");
+                                refetchEvent();
+                                return;
+                            }
+                        } catch (fallbackErr) {
+                            console.error("Fallback check failed:", fallbackErr);
+                        }
+                    }
+
+                    if (msg.includes('Custom: 2006')) {
+                        msg = "Data event tidak kompatibel (Error 2006). Kemungkinan event ini dibuat dengan versi contract lama. Silakan buat event baru.";
+                    }
+                    showDialog("Gagal", `Gagal memulai race: ${msg}`, "error");
+                } finally {
+                    setIsStarting(false);
+                }
+            },
+            "Ya, Mulai Race",
+            "Batal"
+        );
     };
 
     const handleFinalize = async () => {
         if (!program || !event) return;
-        if (!confirm('Apakah Anda yakin ingin memfinalisasi event? Ini akan memicu pembagian hadiah otomatis.')) return;
         
-        setIsFinalizing(true);
-        try {
-            const cleanEventId = event.id.replace(/-/g, '');
-            
-            // Derive Event PDA correctly
-            const [eventPda] = PublicKey.findProgramAddressSync(
-                [Buffer.from('event'), Buffer.from(cleanEventId)],
-                program.programId
-            );
-
-            // 1. Finalize on-chain
-            const txSignature = await program.methods
-                .completeRace(cleanEventId)
-                .accounts({
-                    admin: program.provider.publicKey,
-                    event: eventPda,
-                } as any)
-                .rpc();
-                
-            console.log("Race completed on-chain:", txSignature);
-
-            // 2. Update Supabase Event Status
-            await supabase.from('race_events').update({ status: 'completed' }).eq('id', event.id);
-
-            // 3. Mark non-finishers as disqualified (DNF)
-            await supabase.from('runners')
-                .update({ status: 'disqualified' })
-                .eq('event_id', event.id)
-                .neq('status', 'finished');
-
-            alert(`✅ Event berhasil difinalisasi!\nPeserta yang belum finish telah dinyatakan DNF.\nSistem akan mulai membagikan hadiah.\n\nTX: ${txSignature}`);
-            refetchEvent();
-        } catch (error: any) {
-            console.error("Failed to finalize race:", error);
-            let msg = error.message || String(error);
-
-            // --- Fallback check for RPC Timeout ---
-            if (msg.includes('was not confirmed in 30.00 seconds')) {
+        showDialog(
+            "Konfirmasi Finalisasi",
+            "Apakah Anda yakin ingin memfinalisasi event? Ini akan memicu pembagian hadiah otomatis.",
+            "warning",
+            async () => {
+                setIsFinalizing(true);
                 try {
-                    console.log("Checking on-chain status after timeout...");
                     const cleanEventId = event.id.replace(/-/g, '');
+                    
+                    // Derive Event PDA correctly
                     const [eventPda] = PublicKey.findProgramAddressSync(
                         [Buffer.from('event'), Buffer.from(cleanEventId)],
                         program.programId
                     );
-                    const onChainData = await program.account.event.fetch(eventPda);
-                    
-                    if (onChainData.status.completed || onChainData.status.settled) {
-                        console.log("Transaction actually succeeded on-chain!");
-                        await supabase.from('race_events').update({ status: 'completed' }).eq('id', event.id);
+
+                    // 1. Finalize on-chain
+                    const txSignature = await program.methods
+                        .completeRace(cleanEventId)
+                        .accounts({
+                            admin: program.provider.publicKey,
+                            event: eventPda,
+                        } as any)
+                        .rpc();
                         
-                        await supabase.from('runners')
-                            .update({ status: 'disqualified' })
-                            .eq('event_id', event.id)
-                            .neq('status', 'finished');
+                    console.log("Race completed on-chain:", txSignature);
 
-                        alert(`✅ Event berhasil difinalisasi (Berhasil di-recover dari timeout jaringan)!\nSistem akan mulai membagikan hadiah.`);
-                        refetchEvent();
-                        return;
+                    // 2. Update Supabase Event Status
+                    await supabase.from('race_events').update({ status: 'completed' }).eq('id', event.id);
+
+                    // 3. Mark non-finishers as disqualified (DNF)
+                    await supabase.from('runners')
+                        .update({ status: 'disqualified' })
+                        .eq('event_id', event.id)
+                        .neq('status', 'finished');
+
+                    showDialog("Berhasil!", `Event berhasil difinalisasi!\nPeserta yang belum finish telah dinyatakan DNF.\nSistem akan mulai membagikan hadiah.\n\nTX: ${txSignature}`, "success");
+                    refetchEvent();
+                } catch (error: any) {
+                    console.error("Failed to finalize race:", error);
+                    let msg = error.message || String(error);
+
+                    // --- Fallback check for RPC Timeout ---
+                    if (msg.includes('was not confirmed in 30.00 seconds')) {
+                        try {
+                            console.log("Checking on-chain status after timeout...");
+                            const cleanEventId = event.id.replace(/-/g, '');
+                            const [eventPda] = PublicKey.findProgramAddressSync(
+                                [Buffer.from('event'), Buffer.from(cleanEventId)],
+                                program.programId
+                            );
+                            const onChainData = await program.account.event.fetch(eventPda);
+                            
+                            if (onChainData.status.completed || onChainData.status.settled) {
+                                console.log("Transaction actually succeeded on-chain!");
+                                await supabase.from('race_events').update({ status: 'completed' }).eq('id', event.id);
+                                
+                                await supabase.from('runners')
+                                    .update({ status: 'disqualified' })
+                                    .eq('event_id', event.id)
+                                    .neq('status', 'finished');
+
+                                showDialog("Berhasil!", "Event berhasil difinalisasi (Berhasil di-recover dari timeout jaringan)!\nSistem akan mulai membagikan hadiah.", "success");
+                                refetchEvent();
+                                return;
+                            }
+                        } catch (fallbackErr) {
+                            console.error("Fallback check failed:", fallbackErr);
+                        }
                     }
-                } catch (fallbackErr) {
-                    console.error("Fallback check failed:", fallbackErr);
-                }
-            }
 
-            if (msg.includes('Custom: 2006')) {
-                msg = "Data event tidak kompatibel (Error 2006). Kemungkinan event ini dibuat dengan versi contract lama. Silakan buat event baru.";
-            }
-            alert(`❌ Gagal finalisasi race: ${msg}`);
-        } finally {
-            setIsFinalizing(false);
-        }
+                    if (msg.includes('Custom: 2006')) {
+                        msg = "Data event tidak kompatibel (Error 2006). Kemungkinan event ini dibuat dengan versi contract lama. Silakan buat event baru.";
+                    }
+                    showDialog("Gagal", `Gagal finalisasi race: ${msg}`, "error");
+                } finally {
+                    setIsFinalizing(false);
+                }
+            },
+            "Ya, Finalisasi",
+            "Batal"
+        );
     };
 
     const totalRunners = runners?.length ?? 0;
@@ -358,6 +404,31 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                 </div>
                 <LeaderboardTable runners={runners ?? []} isLoading={runnersLoading} />
             </div>
+
+            <AlertDialog open={dialog.open} onOpenChange={(open) => setDialog(prev => ({ ...prev, open }))}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <div className="flex items-center gap-2">
+                            {dialog.type === 'success' && <CheckCircle2 className="h-5 w-5 text-green-500" />}
+                            {dialog.type === 'error' && <AlertCircle className="h-5 w-5 text-destructive" />}
+                            {dialog.type === 'warning' && <AlertCircle className="h-5 w-5 text-orange-500" />}
+                            {dialog.type === 'info' && <Info className="h-5 w-5 text-blue-500" />}
+                            <AlertDialogTitle>{dialog.title}</AlertDialogTitle>
+                        </div>
+                        <AlertDialogDescription>
+                            {dialog.description}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        {dialog.cancelText && (
+                            <AlertDialogCancel>{dialog.cancelText}</AlertDialogCancel>
+                        )}
+                        <AlertDialogAction onClick={() => dialog.onConfirm?.()}>
+                            {dialog.actionText}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

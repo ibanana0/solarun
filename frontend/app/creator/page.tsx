@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Plus, Trophy, Eye, ArrowLeft, Loader2, LogIn, ShieldAlert, Trash } from 'lucide-react';
+import { Plus, Trophy, Eye, ArrowLeft, Loader2, LogIn, ShieldAlert, Trash, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import { useCreatorEvents } from '@/hooks/useEvent';
 import { useAuth } from '@/hooks/useAuth';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -23,6 +23,16 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { RaceEvent } from '@/lib/supabase';
 
 function formatDate(dateStr: string) {
@@ -32,39 +42,65 @@ function formatDate(dateStr: string) {
     });
 }
 
-function EventRow({ event, onEventDeleted }: { event: RaceEvent; onEventDeleted?: () => void }) {
+interface DialogState {
+    open: boolean;
+    title: string;
+    description: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+    onConfirm?: () => void;
+    cancelText?: string;
+    actionText?: string;
+}
+
+function EventRow({ 
+    event, 
+    onEventDeleted, 
+    showDialog 
+}: { 
+    event: RaceEvent; 
+    onEventDeleted?: () => void;
+    showDialog: (title: string, description: string, type: 'success' | 'error' | 'info' | 'warning', onConfirm?: () => void, actionText?: string, cancelText?: string) => void;
+}) {
     const [isDeleting, setIsDeleting] = useState(false);
 
     const handleDeleteEvent = async () => {
-        if (!confirm('Are you sure you want to delete this event? This will refund all participants.')) {
-            return;
-        }
+        showDialog(
+            "Hapus Event",
+            "Apakah Anda yakin ingin menghapus event ini? Semua peserta akan mendapatkan pengembalian dana (refund) otomatis.",
+            "warning",
+            async () => {
+                setIsDeleting(true);
+                try {
+                    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+                    const response = await fetch(`${backendUrl}/api/events/${event.id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                    });
 
-        setIsDeleting(true);
+                    const data = await response.json();
 
-        try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
-            const response = await fetch(`${backendUrl}/api/events/${event.id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                alert(`✅ Event deleted successfully!\n\nParticipants refunded: ${data.details?.participantsRefunded || 0}`);
-                onEventDeleted?.();
-            } else {
-                alert(`❌ Failed to delete event: ${data.message}`);
-            }
-        } catch (error) {
-            alert(`❌ Error deleting event: ${error}`);
-            console.error('Delete event error:', error);
-        } finally {
-            setIsDeleting(false);
-        }
+                    if (response.ok) {
+                        showDialog(
+                            "Berhasil!", 
+                            `Event berhasil dihapus!\n\nPeserta yang di-refund: ${data.details?.participantsRefunded || 0}`, 
+                            "success",
+                            () => onEventDeleted?.()
+                        );
+                    } else {
+                        showDialog("Gagal", `Gagal menghapus event: ${data.message}`, "error");
+                    }
+                } catch (error) {
+                    showDialog("Error", `Terjadi kesalahan: ${error}`, "error");
+                    console.error('Delete event error:', error);
+                } finally {
+                    setIsDeleting(false);
+                }
+            },
+            "Ya, Hapus",
+            "Batal"
+        );
     };
 
     return (
@@ -118,6 +154,18 @@ export default function CreatorDashboard() {
     const totalEvents = events?.length ?? 0;
     const activeEvents = events?.filter((e) => e.status === 'active').length ?? 0;
     const completedEvents = events?.filter((e) => e.status === 'completed' || e.status === 'settled').length ?? 0;
+
+    // Dialog state
+    const [dialog, setDialog] = useState<DialogState>({
+        open: false,
+        title: '',
+        description: '',
+        type: 'info'
+    });
+
+    const showDialog = (title: string, description: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', onConfirm?: () => void, actionText = 'OK', cancelText?: string) => {
+        setDialog({ open: true, title, description, type, onConfirm, actionText, cancelText });
+    };
 
     // ── Loading auth state ──
     if (!ready || authLoading) {
@@ -278,6 +326,7 @@ export default function CreatorDashboard() {
                                         key={event.id}
                                         event={event}
                                         onEventDeleted={() => refetch?.()}
+                                        showDialog={showDialog}
                                     />
                                 ))}
                             </TableBody>
@@ -285,6 +334,31 @@ export default function CreatorDashboard() {
                     </div>
                 )}
             </div>
+
+            <AlertDialog open={dialog.open} onOpenChange={(open) => setDialog(prev => ({ ...prev, open }))}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <div className="flex items-center gap-2">
+                            {dialog.type === 'success' && <CheckCircle2 className="h-5 w-5 text-green-500" />}
+                            {dialog.type === 'error' && <AlertCircle className="h-5 w-5 text-destructive" />}
+                            {dialog.type === 'warning' && <AlertCircle className="h-5 w-5 text-orange-500" />}
+                            {dialog.type === 'info' && <Info className="h-5 w-5 text-blue-500" />}
+                            <AlertDialogTitle>{dialog.title}</AlertDialogTitle>
+                        </div>
+                        <AlertDialogDescription>
+                            {dialog.description}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        {dialog.cancelText && (
+                            <AlertDialogCancel>{dialog.cancelText}</AlertDialogCancel>
+                        )}
+                        <AlertDialogAction onClick={() => dialog.onConfirm?.()}>
+                            {dialog.actionText}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

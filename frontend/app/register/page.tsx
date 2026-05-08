@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, CheckCircle, Loader2, LogIn, Copy, Check, Ticket } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Loader2, LogIn, Copy, Check, Ticket, AlertCircle, CheckCircle2, Info } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useEvents, useEvent } from '@/hooks/useEvent';
 import { useRunners } from '@/hooks/useRunners';
@@ -27,6 +27,16 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const DEMO_CHIP_UIDS = [
     'CHIP_A1B2C3', 'CHIP_D4E5F6', 'CHIP_G7H8I9', 'CHIP_J0K1L2',
@@ -58,6 +68,26 @@ function RegisterPageContent() {
     const [success, setSuccess] = useState<{ eventId: string; txSignature?: string } | null>(null);
     const [usedChips, setUsedChips] = useState<string[]>([]);
     const [copied, setCopied] = useState(false);
+
+    // Dialog state
+    const [dialog, setDialog] = useState<{
+        open: boolean;
+        title: string;
+        description: string;
+        type: 'success' | 'error' | 'info' | 'warning';
+        onConfirm?: () => void;
+        cancelText?: string;
+        actionText?: string;
+    }>({
+        open: false,
+        title: '',
+        description: '',
+        type: 'info'
+    });
+
+    const showDialog = (title: string, description: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', onConfirm?: () => void, actionText = 'OK', cancelText?: string) => {
+        setDialog({ open: true, title, description, type, onConfirm, actionText, cancelText });
+    };
 
     // Get current event object for status/capacity checks
     const event = eventIdFromUrl ? eventDetails : events?.find(e => e.id === eventId);
@@ -116,7 +146,7 @@ function RegisterPageContent() {
             const runner = program.provider.publicKey;
 
             if (!runner) {
-                setError('Provider publicKey tidak tersedia.');
+                showDialog("Error", "Provider publicKey tidak tersedia.", "error");
                 setSubmitting(false);
                 return;
             }
@@ -138,7 +168,7 @@ function RegisterPageContent() {
 
             if (existingAccount !== null) {
                 // Jika accountInfo tidak null, berarti PDA ini sudah ada (sudah di-init)
-                setError('Chip ini sudah terdaftar untuk event ini di blockchain.');
+                showDialog("Chip Sudah Terdaftar", "Chip ini sudah terdaftar untuk event ini di blockchain.", "warning");
                 setSubmitting(false);
                 return;
             }
@@ -191,16 +221,17 @@ function RegisterPageContent() {
             });
 
             if (insertError) {
-                setError(insertError.code === '23505'
+                const msg = insertError.code === '23505'
                     ? 'Chip UID ini sudah digunakan. Pilih chip lain.'
-                    : `Berhasil di blockchain, tapi gagal simpan ke DB: ${insertError.message}`
-                );
+                    : `Berhasil di blockchain, tapi gagal simpan ke DB: ${insertError.message}`;
+                showDialog("Error Pendaftaran", msg, "error");
                 return;
             }
             setSuccess({ eventId, txSignature: txSignature });
+            showDialog("Pendaftaran Berhasil!", "Pendaftaran kamu telah berhasil diproses secara on-chain.", "success");
         } catch (err: any) {
             console.error("Failed to register:", err);
-            setError(`Terjadi kesalahan: ${err.message || 'Coba lagi.'}`);
+            showDialog("Pendaftaran Gagal", `Terjadi kesalahan: ${err.message || 'Coba lagi.'}`, "error");
         } finally {
             setSubmitting(false);
         }
@@ -235,10 +266,16 @@ function RegisterPageContent() {
         );
     }
 
-    // ── Success ──
-    if (success) {
-        return (
-            <div className="container max-w-md py-12">
+    // ── Form ──
+    return (
+        <div className="container max-w-md py-8 space-y-6">
+            <Button variant="ghost" size="sm" asChild>
+                <Link href="/">
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
+                </Link>
+            </Button>
+
+            {success ? (
                 <Card>
                     <CardContent className="pt-6 space-y-4 text-center">
                         <CheckCircle className="w-12 h-12 mx-auto text-green-500" />
@@ -275,182 +312,196 @@ function RegisterPageContent() {
                         </div>
                     </CardContent>
                 </Card>
-            </div>
-        );
-    }
+            ) : (
+                <Card>
+                    <CardHeader className="pb-4">
+                        <CardTitle>Daftar Event Marathon</CardTitle>
+                        <CardDescription>
+                            Isi form di bawah untuk mendaftarkan diri.
+                        </CardDescription>
 
-    // ── Form ──
-    return (
-        <div className="container max-w-md py-8 space-y-6">
-            <Button variant="ghost" size="sm" asChild>
-                <Link href="/">
-                    <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
-                </Link>
-            </Button>
-
-            <Card>
-                <CardHeader className="pb-4">
-                    <CardTitle>Daftar Event Marathon</CardTitle>
-                    <CardDescription>
-                        Isi form di bawah untuk mendaftarkan diri.
-                    </CardDescription>
-
-                    <div className="pt-4 mt-4 border-t">
-                        <button
-                            onClick={handleCopyAddress}
-                            className="flex items-center justify-between w-full p-2 text-left transition-colors border border-transparent rounded-md bg-secondary/50 hover:bg-secondary group hover:border-border"
-                            title="Salin alamat wallet"
-                        >
-                            <div className="flex flex-col">
-                                <span className="text-[10px] uppercase text-muted-foreground font-bold leading-none mb-1">Your Wallet</span>
-                                <span className="font-mono text-xs break-all text-muted-foreground group-hover:text-foreground">
-                                    {walletAddress}
-                                </span>
-                            </div>
-                            <div className="flex-shrink-0 ml-2">
-                                {copied ? (
-                                    <Check className="w-4 h-4 text-green-500" />
-                                ) : (
-                                    <Copy className="w-4 h-4 transition-opacity opacity-50 text-muted-foreground group-hover:text-foreground group-hover:opacity-100" />
-                                )}
-                            </div>
-                        </button>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        {/* Event Information */}
-                        <div className="space-y-2">
-                            <Label className="text-muted-foreground">Event Details</Label>
-                            {eventIdFromUrl ? (
-                                eventDetailsLoading ? (
-                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        <span>Memuat detail event...</span>
-                                    </div>
-                                ) : eventDetails ? (
-                                    <div className="p-4 space-y-3 border rounded-lg bg-primary/5 border-primary/10">
-                                        <div className="flex items-start gap-3">
-                                            <div className="p-2 mt-1 rounded-md bg-primary/10">
-                                                <Ticket className="w-4 h-4 text-primary" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-sm font-semibold leading-tight">{eventDetails.name}</h3>
-                                                <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-                                                    {eventDetails.description || 'Tidak ada deskripsi.'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <Separator className="bg-primary/10" />
-                                        <div className="flex items-center justify-between text-xs">
-                                            <span className="text-muted-foreground">Biaya Registrasi</span>
-                                            <span className="font-bold text-blue-600 dark:text-blue-400">
-                                                {eventDetails.registration_fee_sol} USDC
-                                            </span>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-destructive">Event tidak ditemukan.</p>
-                                )
-                            ) : (
-                                <div className="space-y-2">
-                                    {eventsLoading ? (
-                                        <p className="text-sm text-muted-foreground">Memuat events...</p>
-                                    ) : activeEvents.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground">Tidak ada event aktif saat ini.</p>
+                        <div className="pt-4 mt-4 border-t">
+                            <button
+                                onClick={handleCopyAddress}
+                                className="flex items-center justify-between w-full p-2 text-left transition-colors border border-transparent rounded-md bg-secondary/50 hover:bg-secondary group hover:border-border"
+                                title="Salin alamat wallet"
+                            >
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] uppercase text-muted-foreground font-bold leading-none mb-1">Your Wallet</span>
+                                    <span className="font-mono text-xs break-all text-muted-foreground group-hover:text-foreground">
+                                        {walletAddress}
+                                    </span>
+                                </div>
+                                <div className="flex-shrink-0 ml-2">
+                                    {copied ? (
+                                        <Check className="w-4 h-4 text-green-500" />
                                     ) : (
-                                        <Select value={eventId} onValueChange={(v) => { setEventId(v); setChipUid(''); setError(null); }}>
-                                            <SelectTrigger id="event_id">
-                                                <SelectValue placeholder="Pilih event..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {activeEvents.map((event) => (
-                                                    <SelectItem key={event.id} value={event.id}>
-                                                        {event.name} ({event.registration_fee_sol} USDC)
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                        <Copy className="w-4 h-4 transition-opacity opacity-50 text-muted-foreground group-hover:text-foreground group-hover:opacity-100" />
                                     )}
                                 </div>
-                            )}
+                            </button>
                         </div>
-
-                        {/* Full Name */}
-                        <div className="space-y-2">
-                            <Label htmlFor="full_name">Nama Lengkap</Label>
-                            <Input
-                                id="full_name"
-                                placeholder="Your Name"
-                                value={fullName}
-                                onChange={(e) => { setFullName(e.target.value); setError(null); }}
-                                disabled={submitting}
-                                autoComplete="name"
-                            />
-                        </div>
-
-                        {/* Chip UID */}
-                        <div className="space-y-2">
-                            <Label htmlFor="chip_uid">Chip RFID UID</Label>
-                            <Select
-                                value={chipUid}
-                                onValueChange={(v) => { setChipUid(v); setError(null); }}
-                                disabled={!eventId}
-                            >
-                                <SelectTrigger id="chip_uid">
-                                    <SelectValue placeholder={!eventId ? 'Pilih event dulu' : 'Pilih Chip UID...'} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {availableChips.map((uid) => (
-                                        <SelectItem key={uid} value={uid}>{uid}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <p className="text-xs text-muted-foreground">
-                                Chip ini digunakan untuk identifikasi di setiap checkpoint.
-                                {eventId && ` (${availableChips.length} tersedia)`}
-                            </p>
-                        </div>
-
-                        {error && (
-                            <p className="text-sm text-destructive">{error}</p>
-                        )}
-
-                        {event && event.status === 'pending' && !isBalanceSufficient && (
-                            <div className="p-3 text-sm border rounded-lg bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-300">
-                                <p className="font-semibold mb-1">⚠️ Saldo Tidak Mencukupi</p>
-                                <ul className="list-disc pl-4 space-y-1 text-xs">
-                                    {!hasEnoughUsdc && (
-                                        <li>Saldo Mock USDC: {usdcBalance.toFixed(2)} (Butuh {feeRequired})</li>
-                                    )}
-                                    {!hasEnoughSol && (
-                                        <li>Saldo SOL (Gas): {solBalance.toFixed(3)} (Butuh &gt; 0.005 SOL)</li>
-                                    )}
-                                </ul>
-                                <p className="mt-2 text-xs opacity-80">Gunakan tombol "Faucet USDC" di menu atas jika butuh Mock USDC.</p>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            {/* Event Information */}
+                            <div className="space-y-2">
+                                <Label className="text-muted-foreground">Event Details</Label>
+                                {eventIdFromUrl ? (
+                                    eventDetailsLoading ? (
+                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            <span>Memuat detail event...</span>
+                                        </div>
+                                    ) : eventDetails ? (
+                                        <div className="p-4 space-y-3 border rounded-lg bg-primary/5 border-primary/10">
+                                            <div className="flex items-start gap-3">
+                                                <div className="p-2 mt-1 rounded-md bg-primary/10">
+                                                    <Ticket className="w-4 h-4 text-primary" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-sm font-semibold leading-tight">{eventDetails.name}</h3>
+                                                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                                                        {eventDetails.description || 'Tidak ada deskripsi.'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <Separator className="bg-primary/10" />
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="text-muted-foreground">Biaya Registrasi</span>
+                                                <span className="font-bold text-blue-600 dark:text-blue-400">
+                                                    {eventDetails.registration_fee_sol} USDC
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-destructive">Event tidak ditemukan.</p>
+                                    )
+                                ) : (
+                                    <div className="space-y-2">
+                                        {eventsLoading ? (
+                                            <p className="text-sm text-muted-foreground">Memuat events...</p>
+                                        ) : activeEvents.length === 0 ? (
+                                            <p className="text-sm text-muted-foreground">Tidak ada event aktif saat ini.</p>
+                                        ) : (
+                                            <Select value={eventId} onValueChange={(v) => { setEventId(v); setChipUid(''); setError(null); }}>
+                                                <SelectTrigger id="event_id">
+                                                    <SelectValue placeholder="Pilih event..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {activeEvents.map((event) => (
+                                                        <SelectItem key={event.id} value={event.id}>
+                                                            {event.name} ({event.registration_fee_sol} USDC)
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                        )}
 
-                        <Button
-                            type="submit"
-                            className="w-full"
-                            disabled={!canRegister || submitting || eventsLoading || (eventIdFromUrl ? !eventDetails : activeEvents.length === 0)}
-                        >
-                            {submitting ? (
-                                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Mendaftarkan...</>
-                            ) : event && runners && runners.length >= event.max_participants ? (
-                                'Event Full'
-                            ) : event?.status !== 'pending' && event?.status !== undefined ? (
-                                'Registration Closed'
-                            ) : !isBalanceSufficient && event ? (
-                                'Saldo Kurang'
-                            ) : (
-                                'Daftar Sekarang'
+                            {/* Full Name */}
+                            <div className="space-y-2">
+                                <Label htmlFor="full_name">Nama Lengkap</Label>
+                                <Input
+                                    id="full_name"
+                                    placeholder="Your Name"
+                                    value={fullName}
+                                    onChange={(e) => { setFullName(e.target.value); setError(null); }}
+                                    disabled={submitting}
+                                    autoComplete="name"
+                                />
+                            </div>
+
+                            {/* Chip UID */}
+                            <div className="space-y-2">
+                                <Label htmlFor="chip_uid">Chip RFID UID</Label>
+                                <Select
+                                    value={chipUid}
+                                    onValueChange={(v) => { setChipUid(v); setError(null); }}
+                                    disabled={!eventId}
+                                >
+                                    <SelectTrigger id="chip_uid">
+                                        <SelectValue placeholder={!eventId ? 'Pilih event dulu' : 'Pilih Chip UID...'} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {availableChips.map((uid) => (
+                                            <SelectItem key={uid} value={uid}>{uid}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">
+                                    Chip ini digunakan untuk identifikasi di setiap checkpoint.
+                                    {eventId && ` (${availableChips.length} tersedia)`}
+                                </p>
+                            </div>
+
+                            {error && (
+                                <p className="text-sm text-destructive">{error}</p>
                             )}
-                        </Button>
-                    </form>
-                </CardContent>
-            </Card>
+
+                            {event && event.status === 'pending' && !isBalanceSufficient && (
+                                <div className="p-3 text-sm border rounded-lg bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-300">
+                                    <p className="font-semibold mb-1">⚠️ Saldo Tidak Mencukupi</p>
+                                    <ul className="list-disc pl-4 space-y-1 text-xs">
+                                        {!hasEnoughUsdc && (
+                                            <li>Saldo Mock USDC: {usdcBalance.toFixed(2)} (Butuh {feeRequired})</li>
+                                        )}
+                                        {!hasEnoughSol && (
+                                            <li>Saldo SOL (Gas): {solBalance.toFixed(3)} (Butuh &gt; 0.005 SOL)</li>
+                                        )}
+                                    </ul>
+                                    <p className="mt-2 text-xs opacity-80">Gunakan tombol "Faucet USDC" di menu atas jika butuh Mock USDC.</p>
+                                </div>
+                            )}
+
+                            <Button
+                                type="submit"
+                                className="w-full"
+                                disabled={!canRegister || submitting || eventsLoading || (eventIdFromUrl ? !eventDetails : activeEvents.length === 0)}
+                            >
+                                {submitting ? (
+                                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Mendaftarkan...</>
+                                ) : event && runners && runners.length >= event.max_participants ? (
+                                    'Event Full'
+                                ) : event?.status !== 'pending' && event?.status !== undefined ? (
+                                    'Registration Closed'
+                                ) : !isBalanceSufficient && event ? (
+                                    'Saldo Kurang'
+                                ) : (
+                                    'Daftar Sekarang'
+                                )}
+                            </Button>
+                        </form>
+                    </CardContent>
+                </Card>
+            )}
+
+            <AlertDialog open={dialog.open} onOpenChange={(open) => setDialog(prev => ({ ...prev, open }))}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <div className="flex items-center gap-2">
+                            {dialog.type === 'success' && <CheckCircle2 className="h-5 w-5 text-green-500" />}
+                            {dialog.type === 'error' && <AlertCircle className="h-5 w-5 text-destructive" />}
+                            {dialog.type === 'warning' && <AlertCircle className="h-5 w-5 text-orange-500" />}
+                            {dialog.type === 'info' && <Info className="h-5 w-5 text-blue-500" />}
+                            <AlertDialogTitle>{dialog.title}</AlertDialogTitle>
+                        </div>
+                        <AlertDialogDescription>
+                            {dialog.description}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        {dialog.cancelText && (
+                            <AlertDialogCancel>{dialog.cancelText}</AlertDialogCancel>
+                        )}
+                        <AlertDialogAction onClick={() => dialog.onConfirm?.()}>
+                            {dialog.actionText}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

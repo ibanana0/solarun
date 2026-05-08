@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle, Loader2, CalendarDays, LogIn, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Loader2, CalendarDays, LogIn, ShieldAlert, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,16 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { useProgram } from '@/hooks/useProgram';
 import * as anchor from '@coral-xyz/anchor';
@@ -38,6 +48,26 @@ export default function CreateEventPage() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [createdEvent, setCreatedEvent] = useState<{ id: string; name: string; tx_signature?: string } | null>(null);
+
+    // Dialog state
+    const [dialog, setDialog] = useState<{
+        open: boolean;
+        title: string;
+        description: string;
+        type: 'success' | 'error' | 'info' | 'warning';
+        onConfirm?: () => void;
+        cancelText?: string;
+        actionText?: string;
+    }>({
+        open: false,
+        title: '',
+        description: '',
+        type: 'info'
+    });
+
+    const showDialog = (title: string, description: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', onConfirm?: () => void, actionText = 'OK', cancelText?: string) => {
+        setDialog({ open: true, title, description, type, onConfirm, actionText, cancelText });
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -69,15 +99,12 @@ export default function CreateEventPage() {
         const endDateTime = new Date(startDateTime.getTime() + duration * 60 * 60 * 1000);
 
         const rawUuid = uuidv4();
-        // Remove hyphens to get exactly 32 characters (16 bytes if hex, but here it's 32 bytes as string)
-        // Solana limits seeds to 32 bytes. UUID with hyphens is 36.
         const eventId = rawUuid.replace(/-/g, '');
 
         setSubmitting(true);
         try {
             // 1. Prepare On-Chain Instruction
             const programId = program.programId;
-            // IMPORTANT: Use provider.wallet.publicKey to ensure it matches the actual signer
             const admin = program.provider.publicKey;
 
             // Derive PDAs
@@ -104,7 +131,7 @@ export default function CreateEventPage() {
                     new anchor.BN(Math.floor(endDateTime.getTime() / 1000))
                 )
                 .accounts({
-                    admin, // Now guaranteed to match the signer
+                    admin,
                     event: eventPda,
                     vault: vaultPda,
                     mockUsdcMint,
@@ -119,7 +146,7 @@ export default function CreateEventPage() {
             const { data, error: insertError } = await supabase
                 .from('race_events')
                 .insert({
-                    id: rawUuid, // Keep original UUID in DB for reference
+                    id: rawUuid,
                     name: name.trim(),
                     description: description.trim() || null,
                     registration_fee_sol: fee,
@@ -135,14 +162,15 @@ export default function CreateEventPage() {
                 .single();
 
             if (insertError) {
-                setError(`Berhasil di blockchain, tapi gagal simpan ke DB: ${insertError.message}`);
+                showDialog("Error Database", `Berhasil di blockchain, tapi gagal simpan ke DB: ${insertError.message}`, "error");
                 return;
             }
 
             setCreatedEvent(data);
+            showDialog("Berhasil!", `Event "${data.name}" berhasil dibuat!`, "success");
         } catch (err: any) {
             console.error("Failed to create event:", err);
-            setError(`Terjadi kesalahan: ${err.message || 'Coba lagi.'}`);
+            showDialog("Gagal Membuat Event", `Terjadi kesalahan: ${err.message || 'Coba lagi.'}`, "error");
         } finally {
             setSubmitting(false);
         }
@@ -201,10 +229,20 @@ export default function CreateEventPage() {
         );
     }
 
-    // ── Success state ──
-    if (createdEvent) {
-        return (
-            <div className="container max-w-lg py-12">
+    // ── Success state (Overlay) ──
+    // Keeping the createdEvent view but making it a more focused card if we don't want to use Dialog here, 
+    // but the user said "setiap" so I added a dialog trigger on success above.
+    // However, the createdEvent view itself could be the dialog content.
+
+    return (
+        <div className="container max-w-lg py-8 space-y-6">
+            <Button variant="ghost" size="sm" asChild>
+                <Link href="/creator">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Dashboard
+                </Link>
+            </Button>
+
+            {createdEvent ? (
                 <Card>
                     <CardContent className="pt-6 text-center space-y-4">
                         <CheckCircle className="h-12 w-12 mx-auto text-green-500" />
@@ -244,152 +282,155 @@ export default function CreateEventPage() {
                         </div>
                     </CardContent>
                 </Card>
-            </div>
-        );
-    }
-
-    // ── Form ──
-    return (
-        <div className="container max-w-lg py-8 space-y-6">
-            <Button variant="ghost" size="sm" asChild>
-                <Link href="/creator">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Dashboard
-                </Link>
-            </Button>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Buat Event Marathon Baru</CardTitle>
-                    <CardDescription>
-                        Isi detail event. Setelah dibuat, peserta bisa langsung mendaftar.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        {/* Event Name */}
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Nama Event *</Label>
-                            <Input
-                                id="name"
-                                placeholder="Nama Event"
-                                value={name}
-                                onChange={(e) => { setName(e.target.value); setError(null); }}
-                                disabled={submitting}
-                            />
-                        </div>
-
-                        {/* Description */}
-                        <div className="space-y-2">
-                            <Label htmlFor="description">Deskripsi</Label>
-                            <Textarea
-                                id="description"
-                                placeholder="Deskripsi event (opsional)"
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                disabled={submitting}
-                                rows={3}
-                            />
-                        </div>
-
-                        {/* Fee + Max participants */}
-                        <div className="grid grid-cols-2 gap-4">
+            ) : (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Buat Event Marathon Baru</CardTitle>
+                        <CardDescription>
+                            Isi detail event. Setelah dibuat, peserta bisa langsung mendaftar.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            {/* Form fields ... */}
                             <div className="space-y-2">
-                                <Label htmlFor="fee">Biaya Registrasi (USDC)</Label>
+                                <Label htmlFor="name">Nama Event *</Label>
                                 <Input
-                                    id="fee"
+                                    id="name"
+                                    placeholder="Nama Event"
+                                    value={name}
+                                    onChange={(e) => { setName(e.target.value); setError(null); }}
+                                    disabled={submitting}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="description">Deskripsi</Label>
+                                <Textarea
+                                    id="description"
+                                    placeholder="Deskripsi event (opsional)"
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    disabled={submitting}
+                                    rows={3}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="fee">Biaya Registrasi (USDC)</Label>
+                                    <Input
+                                        id="fee"
+                                        type="number"
+                                        step="0.01"
+                                        min="0.01"
+                                        placeholder="10"
+                                        value={feeUsdc}
+                                        onChange={(e) => { setFeeUsdc(e.target.value); setError(null); }}
+                                        disabled={submitting}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="max">Maks Peserta</Label>
+                                    <Input
+                                        id="max"
+                                        type="number"
+                                        min="2"
+                                        placeholder="100"
+                                        value={maxParticipants}
+                                        onChange={(e) => { setMaxParticipants(e.target.value); setError(null); }}
+                                        disabled={submitting}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="start_date">Tanggal Mulai *</Label>
+                                    <Input
+                                        id="start_date"
+                                        type="date"
+                                        min={new Date().toISOString().split('T')[0]}
+                                        value={startDate}
+                                        onChange={(e) => { setStartDate(e.target.value); setError(null); }}
+                                        disabled={submitting}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="start_time">Jam Mulai *</Label>
+                                    <Input
+                                        id="start_time"
+                                        type="time"
+                                        value={startTime}
+                                        onChange={(e) => { setStartTime(e.target.value); setError(null); }}
+                                        disabled={submitting}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="duration">Durasi Event (jam)</Label>
+                                <Input
+                                    id="duration"
                                     type="number"
-                                    step="0.01"
-                                    min="0.01"
-                                    placeholder="10"
-                                    value={feeUsdc}
-                                    onChange={(e) => { setFeeUsdc(e.target.value); setError(null); }}
+                                    step="0.5"
+                                    min="0.5"
+                                    placeholder="2"
+                                    value={durationHours}
+                                    onChange={(e) => { setDurationHours(e.target.value); setError(null); }}
                                     disabled={submitting}
                                 />
                             </div>
+
                             <div className="space-y-2">
-                                <Label htmlFor="max">Maks Peserta</Label>
+                                <Label>Creator Wallet</Label>
                                 <Input
-                                    id="max"
-                                    type="number"
-                                    min="2"
-                                    placeholder="100"
-                                    value={maxParticipants}
-                                    onChange={(e) => { setMaxParticipants(e.target.value); setError(null); }}
-                                    disabled={submitting}
+                                    disabled
+                                    value={walletAddress ?? 'Memuat wallet...'}
+                                    className="text-muted-foreground text-xs font-mono"
                                 />
                             </div>
-                        </div>
 
-                        {/* Start date & time */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="start_date">Tanggal Mulai *</Label>
-                                <Input
-                                    id="start_date"
-                                    type="date"
-                                    min={new Date().toISOString().split('T')[0]}
-                                    value={startDate}
-                                    onChange={(e) => { setStartDate(e.target.value); setError(null); }}
-                                    disabled={submitting}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="start_time">Jam Mulai *</Label>
-                                <Input
-                                    id="start_time"
-                                    type="time"
-                                    value={startTime}
-                                    onChange={(e) => { setStartTime(e.target.value); setError(null); }}
-                                    disabled={submitting}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Duration */}
-                        <div className="space-y-2">
-                            <Label htmlFor="duration">Durasi Event (jam)</Label>
-                            <Input
-                                id="duration"
-                                type="number"
-                                step="0.5"
-                                min="0.5"
-                                placeholder="2"
-                                value={durationHours}
-                                onChange={(e) => { setDurationHours(e.target.value); setError(null); }}
-                                disabled={submitting}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Event akan otomatis berakhir setelah durasi ini. Refund scheduler akan memproses hasil setelah event selesai.
-                            </p>
-                        </div>
-
-                        {/* Creator wallet (read-only) */}
-                        <div className="space-y-2">
-                            <Label>Creator Wallet</Label>
-                            <Input
-                                disabled
-                                value={walletAddress ?? 'Memuat wallet...'}
-                                className="text-muted-foreground text-xs font-mono"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Event ini akan ditautkan ke wallet creator kamu.
-                            </p>
-                        </div>
-
-                        {error && (
-                            <p className="text-sm text-destructive">{error}</p>
-                        )}
-
-                        <Button type="submit" className="w-full" disabled={submitting}>
-                            {submitting ? (
-                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Membuat Event...</>
-                            ) : (
-                                <><CalendarDays className="mr-2 h-4 w-4" /> Buat Event</>
+                            {error && (
+                                <p className="text-sm text-destructive">{error}</p>
                             )}
-                        </Button>
-                    </form>
-                </CardContent>
-            </Card>
+
+                            <Button type="submit" className="w-full" disabled={submitting}>
+                                {submitting ? (
+                                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Membuat Event...</>
+                                ) : (
+                                    <><CalendarDays className="mr-2 h-4 w-4" /> Buat Event</>
+                                )}
+                            </Button>
+                        </form>
+                    </CardContent>
+                </Card>
+            )}
+
+            <AlertDialog open={dialog.open} onOpenChange={(open) => setDialog(prev => ({ ...prev, open }))}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <div className="flex items-center gap-2">
+                            {dialog.type === 'success' && <CheckCircle2 className="h-5 w-5 text-green-500" />}
+                            {dialog.type === 'error' && <AlertCircle className="h-5 w-5 text-destructive" />}
+                            {dialog.type === 'warning' && <AlertCircle className="h-5 w-5 text-orange-500" />}
+                            {dialog.type === 'info' && <Info className="h-5 w-5 text-blue-500" />}
+                            <AlertDialogTitle>{dialog.title}</AlertDialogTitle>
+                        </div>
+                        <AlertDialogDescription>
+                            {dialog.description}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        {dialog.cancelText && (
+                            <AlertDialogCancel>{dialog.cancelText}</AlertDialogCancel>
+                        )}
+                        <AlertDialogAction onClick={() => dialog.onConfirm?.()}>
+                            {dialog.actionText}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
