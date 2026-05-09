@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SOLARUN // RACE DISCOVERY</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Space+Mono:wght@400;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-highest": "#353434",
+                    "primary": "#ffffff",
+                    "background": "#141313",
+                    "error": "#ffb4ab",
+                    "tertiary": "#ffffff",
+                    "on-primary-container": "#636565",
+                    "secondary-fixed-dim": "#c6c6c6",
+                    "on-primary-fixed-variant": "#454747",
+                    "tertiary-container": "#e2e2e2",
+                    "surface-dim": "#141313",
+                    "primary-fixed-dim": "#c6c6c7",
+                    "primary-fixed": "#e2e2e2",
+                    "on-secondary-fixed-variant": "#474747",
+                    "outline": "#8e9192",
+                    "tertiary-fixed-dim": "#c6c6c7",
+                    "on-error-container": "#ffdad6",
+                    "surface-bright": "#3a3939",
+                    "inverse-primary": "#5d5f5f",
+                    "secondary": "#c6c6c6",
+                    "secondary-fixed": "#e2e2e2",
+                    "on-surface": "#e5e2e1",
+                    "tertiary-fixed": "#e2e2e2",
+                    "on-tertiary-container": "#636565",
+                    "on-primary": "#2f3131",
+                    "inverse-surface": "#e5e2e1",
+                    "surface-container": "#201f1f",
+                    "surface-container-lowest": "#0e0e0e",
+                    "on-error": "#690005",
+                    "secondary-container": "#474747",
+                    "outline-variant": "#444748",
+                    "surface-container-high": "#2a2a2a",
+                    "surface-tint": "#c6c6c7",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "on-secondary": "#303030",
+                    "primary-container": "#e2e2e2",
+                    "on-secondary-container": "#b5b5b5",
+                    "surface-variant": "#353434",
+                    "surface-container-low": "#1c1b1b",
+                    "on-surface-variant": "#c4c7c8",
+                    "surface": "#141313",
+                    "on-primary-fixed": "#1a1c1c",
+                    "on-tertiary": "#2f3131",
+                    "error-container": "#93000a",
+                    "on-secondary-fixed": "#1b1b1b",
+                    "on-background": "#e5e2e1",
+                    "inverse-on-surface": "#313030",
+                    "on-tertiary-fixed-variant": "#454747"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0px",
+                    "lg": "0px",
+                    "xl": "0px",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "md": "16px",
+                    "xs": "4px",
+                    "sm": "8px",
+                    "xl": "64px",
+                    "unit": "4px",
+                    "margin": "40px",
+                    "gutter": "24px",
+                    "lg": "32px"
+            },
+            "fontFamily": {
+                    "display-xl": ["Anton"],
+                    "label-caps": ["Space Mono"],
+                    "body-sm": ["Space Mono"],
+                    "headline-md": ["Anton"],
+                    "headline-lg": ["Anton"],
+                    "body-lg": ["Space Mono"],
+                    "data-lg": ["Space Mono"]
+            },
+            "fontSize": {
+                    "display-xl": ["120px", {"lineHeight": "100px", "letterSpacing": "-0.04em", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "headline-md": ["32px", {"lineHeight": "32px", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "headline-lg": ["64px", {"lineHeight": "60px", "letterSpacing": "-0.02em", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "data-lg": ["24px", {"lineHeight": "24px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .hard-offset {
+            box-shadow: 4px 4px 0px 0px #ffffff;
+        }
+        .hard-offset-active:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px 0px #ffffff;
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #141313; }
+        ::-webkit-scrollbar-thumb { background: #ffffff; }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-sm selection:bg-primary selection:text-background">
+<!-- TopAppBar Component -->
+<header class="flex justify-between items-center w-full px-margin py-md h-24 docked full-width top-0 z-50 bg-background dark:bg-background border-b-2 border-primary">
+<div class="font-headline-lg text-headline-lg text-primary tracking-tighter uppercase">SOLARUN</div>
+<nav class="hidden md:flex items-center gap-lg">
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">RACES</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">VAULTS</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">GOVERNANCE</a>
+</nav>
+<button class="font-label-caps text-label-caps border-2 border-primary px-lg py-sm hover:bg-primary hover:text-on-primary transition-none active:translate-y-1">
+            CONNECT WALLET
+        </button>
+</header>
+<main class="min-h-screen px-margin pt-xl pb-xl flex flex-col md:flex-row gap-gutter">
+<!-- Sidebar Filter -->
+<aside class="w-full md:w-80 flex-shrink-0 flex flex-col gap-lg">
+<div class="border-2 border-primary p-lg">
+<div class="font-headline-md text-headline-md mb-lg">FILTERS</div>
+<!-- Filter Section: Distance -->
+<div class="mb-xl">
+<label class="font-label-caps text-label-caps text-on-surface-variant block mb-md">DISTANCE</label>
+<div class="flex flex-col gap-sm">
+<label class="flex items-center gap-sm cursor-pointer group">
+<input class="appearance-none w-5 h-5 border-2 border-primary checked:bg-primary focus:ring-0" type="checkbox"/>
+<span class="font-label-caps text-label-caps group-hover:text-primary">5K SPRINTS</span>
+</label>
+<label class="flex items-center gap-sm cursor-pointer group">
+<input class="appearance-none w-5 h-5 border-2 border-primary checked:bg-primary focus:ring-0" type="checkbox"/>
+<span class="font-label-caps text-label-caps group-hover:text-primary">10K ENDURANCE</span>
+</label>
+<label class="flex items-center gap-sm cursor-pointer group">
+<input class="appearance-none w-5 h-5 border-2 border-primary checked:bg-primary focus:ring-0" type="checkbox"/>
+<span class="font-label-caps text-label-caps group-hover:text-primary">MARATHON PROTOCOL</span>
+</label>
+</div>
+</div>
+<!-- Filter Section: Entry Fee -->
+<div class="mb-xl">
+<label class="font-label-caps text-label-caps text-on-surface-variant block mb-md">MAX ENTRY FEE (SOL)</label>
+<input class="w-full bg-transparent border-b-2 border-primary py-sm font-data-lg text-data-lg focus:outline-none placeholder:text-surface-container-highest" placeholder="0.00" type="text"/>
+</div>
+<!-- Filter Section: Prize Pool -->
+<div>
+<label class="font-label-caps text-label-caps text-on-surface-variant block mb-md">MIN PRIZE POOL (SOL)</label>
+<div class="grid grid-cols-2 gap-sm">
+<button class="border-2 border-primary py-xs font-label-caps text-label-caps hover:bg-primary hover:text-on-primary">10+</button>
+<button class="border-2 border-primary py-xs font-label-caps text-label-caps hover:bg-primary hover:text-on-primary">50+</button>
+<button class="border-2 border-primary py-xs font-label-caps text-label-caps hover:bg-primary hover:text-on-primary">100+</button>
+<button class="border-2 border-primary py-xs font-label-caps text-label-caps hover:bg-primary hover:text-on-primary">500+</button>
+</div>
+</div>
+</div>
+<div class="border-2 border-primary p-lg bg-surface-container-low">
+<span class="material-symbols-outlined mb-sm" data-icon="terminal">terminal</span>
+<p class="font-body-sm text-body-sm leading-tight text-on-surface-variant">
+                    ALL RACE DATA IS VALIDATED VIA COMPOSITE PROOF-OF-WORK AND PHYSICAL TELEMETRY ENCLAVES.
+                </p>
+</div>
+</aside>
+<!-- Race Discovery Content -->
+<section class="flex-grow">
+<div class="flex justify-between items-end mb-lg border-b-2 border-primary pb-sm">
+<h1 class="font-display-xl text-headline-lg uppercase">DISCOVERY_CANVAS</h1>
+<div class="font-label-caps text-label-caps pb-xs">LATEST_SYNC: 14:02:44 UTC</div>
+</div>
+<!-- Bento Grid / Technical Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-gutter">
+<!-- Race Card 1 -->
+<div class="border-2 border-primary p-lg flex flex-col gap-lg relative hover:bg-surface-container-lowest transition-none">
+<div class="flex justify-between items-start">
+<div>
+<span class="font-label-caps text-label-caps px-sm py-xs border-2 border-primary inline-block mb-md">LIVE_ENTRY</span>
+<h2 class="font-headline-md text-headline-md leading-none">SOLANA SPRINT #45</h2>
+</div>
+<div class="text-right">
+<div class="font-label-caps text-label-caps text-on-surface-variant">PRIZE_POOL</div>
+<div class="font-data-lg text-data-lg">250 SOL</div>
+</div>
+</div>
+<div class="w-full h-32 bg-surface-container-high overflow-hidden border-2 border-primary grayscale">
+<img alt="Abstract runner" class="w-full h-full object-cover mix-blend-multiply opacity-50" data-alt="A high-contrast cinematic photograph of a runner's silhouette against a stark white horizon. The composition is extremely minimalist with deep black shadows and blinding white highlights. The atmosphere is intense and athletic, suggesting high speed and endurance in a technical, digital environment. Dark mode aesthetic with aggressive lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCHzuIvqOLw8UA6mmGmwFkug6eZMMcEoZIXsJmVskglzOlgcfq3hsFOSM1TfxCERuWB33AQB9IXem1n1M0aQ5srl1NYyPjgl83IA68_M4XD5GLX0qDdKrQDKKVR_yNo9fIVosFaMnaZS6mHVfoZTI0h2D2lXATtLEb2G95RLGYIM6s5S1GE-ZAVNJzpc4CvKDipaDhoMvPxStSOuujQdPOjqsTv9U3rd64dv06k-dklHA8RckuFpJxsKPC9MUOkmGlSJffFTgDV6mA"/>
+</div>
+<div class="grid grid-cols-2 gap-gutter">
+<div>
+<div class="font-label-caps text-label-caps text-on-surface-variant">START_TIME</div>
+<div class="font-body-lg text-body-lg font-bold">T-MINUS 04:12:00</div>
+</div>
+<div class="text-right">
+<div class="font-label-caps text-label-caps text-on-surface-variant">PARTICIPANTS</div>
+<div class="font-body-lg text-body-lg font-bold">1,244 / 2,000</div>
+</div>
+</div>
+<button class="w-full border-2 border-primary py-md font-label-caps text-label-caps hover:bg-primary hover:text-on-primary transition-none active:translate-y-1">
+                        ENTER RACE
+                    </button>
+</div>
+<!-- Race Card 2 -->
+<div class="border-2 border-primary p-lg flex flex-col gap-lg relative hover:bg-surface-container-lowest transition-none">
+<div class="flex justify-between items-start">
+<div>
+<span class="font-label-caps text-label-caps px-sm py-xs border-2 border-primary inline-block mb-md">ELITE_PROTOCOL</span>
+<h2 class="font-headline-md text-headline-md leading-none">GENESIS MARATHON</h2>
+</div>
+<div class="text-right">
+<div class="font-label-caps text-label-caps text-on-surface-variant">PRIZE_POOL</div>
+<div class="font-data-lg text-data-lg">1,500 SOL</div>
+</div>
+</div>
+<div class="w-full h-32 bg-surface-container-high overflow-hidden border-2 border-primary grayscale">
+<img alt="Technical landscape" class="w-full h-full object-cover mix-blend-multiply opacity-50" data-alt="An architectural shot of a brutalist stadium structure at dawn, rendered in stark monochrome. The perspective is looking up, emphasizing sharp angles and geometric concrete patterns. The lighting is cold and early-morning, creating long, hard-edged shadows that align with an aggressive minimalist UI. Technical and elitist mood." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8nNgUibzhjXS-0AcPLlJ8pPCuaokMaMGKuF5oNcQ_Z9ZgcD7LHip_T1EEsP_O9BgoBIoaVENaEAf-AfQn6RcMcIIObpHEKT8xIC3-xSryfloiq-jOKIxC--4lM7hCKmutHoOtDmzSaIU5XjcqPwEnpg6D-KbrfRJaeyX9Y6c4Y3QBuDftBFNwwOtoeeEUevDpAoqsHpu_a1i9E31vA51zOrkECqT-Ir7U3-n1yJCHpyuPZHtky3FxLo1RgkdSYKLgreqWiG72LmA"/>
+</div>
+<div class="grid grid-cols-2 gap-gutter">
+<div>
+<div class="font-label-caps text-label-caps text-on-surface-variant">START_TIME</div>
+<div class="font-body-lg text-body-lg font-bold">24 OCT // 08:00</div>
+</div>
+<div class="text-right">
+<div class="font-label-caps text-label-caps text-on-surface-variant">PARTICIPANTS</div>
+<div class="font-body-lg text-body-lg font-bold">89 / 100</div>
+</div>
+</div>
+<button class="w-full border-2 border-primary py-md font-label-caps text-label-caps hover:bg-primary hover:text-on-primary transition-none active:translate-y-1">
+                        ENTER RACE
+                    </button>
+</div>
+<!-- Race Card 3 -->
+<div class="border-2 border-primary p-lg flex flex-col gap-lg relative hover:bg-surface-container-lowest transition-none">
+<div class="flex justify-between items-start">
+<div>
+<span class="font-label-caps text-label-caps px-sm py-xs border-2 border-primary inline-block mb-md">RAPID_SYNC</span>
+<h2 class="font-headline-md text-headline-md leading-none">DOWNTOWN 10K</h2>
+</div>
+<div class="text-right">
+<div class="font-label-caps text-label-caps text-on-surface-variant">PRIZE_POOL</div>
+<div class="font-data-lg text-data-lg">120 SOL</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-gutter">
+<div>
+<div class="font-label-caps text-label-caps text-on-surface-variant">START_TIME</div>
+<div class="font-body-lg text-body-lg font-bold">T-MINUS 12:45:11</div>
+</div>
+<div class="text-right">
+<div class="font-label-caps text-label-caps text-on-surface-variant">PARTICIPANTS</div>
+<div class="font-body-lg text-body-lg font-bold">452 / 500</div>
+</div>
+</div>
+<button class="w-full border-2 border-primary py-md font-label-caps text-label-caps hover:bg-primary hover:text-on-primary transition-none active:translate-y-1">
+                        ENTER RACE
+                    </button>
+</div>
+<!-- Race Card 4 - Upcoming / Locked -->
+<div class="border-2 border-primary p-lg flex flex-col gap-lg relative bg-surface-container-lowest">
+<div class="flex justify-between items-start opacity-40">
+<div>
+<span class="font-label-caps text-label-caps px-sm py-xs border-2 border-primary inline-block mb-md">LOCKED</span>
+<h2 class="font-headline-md text-headline-md leading-none">NEON OVERDRIVE 5K</h2>
+</div>
+<div class="text-right">
+<div class="font-label-caps text-label-caps">PRIZE_POOL</div>
+<div class="font-data-lg text-data-lg">TBA</div>
+</div>
+</div>
+<div class="flex flex-col items-center justify-center py-xl">
+<span class="material-symbols-outlined text-headline-lg" data-icon="lock">lock</span>
+<div class="font-label-caps text-label-caps mt-md">UNLOCKING IN 12 DAYS</div>
+</div>
+<button class="w-full border-2 border-outline py-md font-label-caps text-label-caps text-outline cursor-not-allowed" disabled="">
+                        REGISTRATION CLOSED
+                    </button>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer Component -->
+<footer class="flex flex-col md:flex-row justify-between items-center w-full px-margin py-lg gap-gutter bg-background dark:bg-background border-t-2 border-primary">
+<div class="font-headline-md text-headline-md text-primary">SOLARUN</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant text-center md:text-left">
+            © 2024 SOLARUN PROTOCOL // ALL PERFORMANCE DATA ON-CHAIN
+        </div>
+<nav class="flex gap-lg">
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">DOCS</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">GITHUB</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">AUDIT</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">PRIVACY</a>
+</nav>
+</footer>
+</body></html>

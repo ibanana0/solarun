@@ -207,6 +207,7 @@ export function Navbar() {
             
             <nav className="hidden lg:flex items-center gap-8">
                 <Link className="font-label-caps text-[12px] text-on-surface-variant hover:text-primary transition-none uppercase tracking-widest" href="/">RACES</Link>
+                <Link className="font-label-caps text-[12px] text-on-surface-variant hover:text-primary transition-none uppercase tracking-widest" href="/events">EXPLORE</Link>
                 {authenticated && isCreator && (
                     <Link className="font-label-caps text-[12px] text-on-surface-variant hover:text-primary transition-none uppercase tracking-widest flex items-center gap-1" href="/creator">
                         <Shield className="h-3 w-3" /> CREATOR_HUB

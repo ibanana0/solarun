@@ -80,3 +80,17 @@
     font-family: var(--font-anton), sans-serif;
   }
 }
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #141313; }
+::-webkit-scrollbar-thumb { background: #ffffff; }
+
+/* Hard offset box-shadow utility */
+.hard-offset {
+    box-shadow: 4px 4px 0px 0px #ffffff;
+}
+.hard-offset-active:active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0px 0px #ffffff;
+}
