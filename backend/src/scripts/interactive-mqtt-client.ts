@@ -22,17 +22,25 @@ const rl = readline.createInterface({
 let eventId = '';
 let cleanEventId = '';
 
+interface CheckpointDef {
+    id: number;
+    label: string;
+    command: string; // CLI command name (e.g., 'start', 'cp1', 'finish')
+}
+
 interface RunnerState {
     name: string;
     chipUid: string;
     walletAddress: string;
     dbRunnerId: string;       // Supabase runner ID (for race_logs lookup)
-    lastCheckpoint: number;   // -1 = not started, 0 = started, 1 = cp1, 2 = finished
+    lastCheckpoint: number;   // -1 = not started, 0 = started, etc.
     status: string;           // display status label
     finishPosition: number | null;
 }
 
 let runners: RunnerState[] = [];
+let checkpointDefs: CheckpointDef[] = [];
+let CP_LABELS: Record<number, string> = {};
 let mqttClient: mqtt.MqttClient;
 
 // ============================================================================
@@ -93,7 +101,40 @@ async function fetchHybridState() {
 
     console.log(`✅ Event status on-chain: ${eventStatus}`);
 
-    // 2. Fetch runners from Supabase (to get chip_uid + runner_id mapping)
+    // 2. Fetch event details from Supabase (to get checkpoints_config)
+    const { data: eventData, error: eventDbError } = await supabase
+        .from('race_events')
+        .select('checkpoints_config')
+        .eq('id', eventId)
+        .single();
+
+    // Build checkpoint definitions from event config
+    const cpConfig: Array<{ id: number; label: string }> = eventData?.checkpoints_config ?? [];
+
+    if (cpConfig.length < 2) {
+        // Fallback to default 3 checkpoints if no config
+        console.log('⚠️  No checkpoints_config found in DB, using default 3-checkpoint layout.');
+        checkpointDefs = [
+            { id: 0, label: 'Start', command: 'start' },
+            { id: 1, label: 'Mid', command: 'cp1' },
+            { id: 2, label: 'Finish', command: 'finish' },
+        ];
+    } else {
+        checkpointDefs = cpConfig.map((cp, idx) => {
+            const isFirst = idx === 0;
+            const isLast = idx === cpConfig.length - 1;
+            const command = isFirst ? 'start' : isLast ? 'finish' : `cp${idx}`;
+            return { id: cp.id, label: cp.label || (isFirst ? 'Start' : isLast ? 'Finish' : `CP${idx}`), command };
+        });
+    }
+
+    // Build label map
+    CP_LABELS = {};
+    checkpointDefs.forEach(def => { CP_LABELS[def.id] = def.label; });
+
+    console.log(`📍 Event has ${checkpointDefs.length} checkpoints: ${checkpointDefs.map(d => `${d.command}(CP${d.id}:${d.label})`).join(' → ')}`);
+
+    // 3. Fetch runners from Supabase (to get chip_uid + runner_id mapping)
     const { data: dbRunners, error } = await supabase
         .from('runners')
         .select('id, full_name, chip_uid, wallet_address, status, finish_position')
@@ -158,8 +199,9 @@ async function fetchHybridState() {
 
         // Derive a better status label based on lastCp
         let displayStatus = onChainStatus;
-        if (onChainStatus === 'Running' && lastCp === 1) {
-            displayStatus = 'Running (CP1)';
+        if (onChainStatus === 'Running' && lastCp > 0) {
+            const cpLabel = CP_LABELS[lastCp] ?? `CP${lastCp}`;
+            displayStatus = `Running (${cpLabel})`;
         }
 
         runners.push({
@@ -196,27 +238,35 @@ function printStatus() {
 }
 
 function printHelp() {
-    console.log(`
-============= SIMULATION COMMANDS =============
-start all    : Checkpoint 0 (Start) for ALL runners
-cp1 all      : Checkpoint 1 (Mid) for ALL runners
-finish all   : Checkpoint 2 (Finish) for ALL runners
-start <id>   : Checkpoint 0 for runner #<id>
-cp1 <id>     : Checkpoint 1 for runner #<id>
-finish <id>  : Checkpoint 2 for runner #<id>
-status       : Show runner list with current status
-refresh      : Re-fetch state from blockchain + DB
-help         : Show this help menu
-exit/quit    : Exit simulator
-=================================================
-`);
+    console.log(`\n============= SIMULATION COMMANDS =============`);
+    checkpointDefs.forEach(def => {
+        console.log(`${def.command} all`.padEnd(17) + `: ${def.label} (CP${def.id}) for ALL runners`);
+    });
+    checkpointDefs.forEach(def => {
+        console.log(`${def.command} <id>`.padEnd(17) + `: ${def.label} (CP${def.id}) for runner #<id>`);
+    });
+    console.log(`status           : Show runner list with current status`);
+    console.log(`refresh          : Re-fetch state from blockchain + DB`);
+    console.log(`help             : Show this help menu`);
+    console.log(`exit/quit        : Exit simulator`);
+    console.log(`=================================================\n`);
 }
 
 // ============================================================================
 // Checkpoint Logic
 // ============================================================================
 
-const CP_LABELS: Record<number, string> = { 0: 'Start', 1: 'Mid', 2: 'Finish' };
+function getExpectedCheckpointId(runner: RunnerState): number {
+    // Find the next checkpoint in sequence based on checkpointDefs
+    const currentIdx = checkpointDefs.findIndex(d => d.id === runner.lastCheckpoint);
+    if (currentIdx === -1) return checkpointDefs[0]?.id ?? 0; // Not started -> first CP
+    if (currentIdx >= checkpointDefs.length - 1) return -1;   // Already at last CP
+    return checkpointDefs[currentIdx + 1].id;
+}
+
+function isLastCheckpoint(checkpointId: number): boolean {
+    return checkpointDefs.length > 0 && checkpointDefs[checkpointDefs.length - 1].id === checkpointId;
+}
 
 function canSendCheckpoint(runner: RunnerState, checkpointId: number): string | null {
     if (runner.status.startsWith('Finished')) {
@@ -226,7 +276,10 @@ function canSendCheckpoint(runner: RunnerState, checkpointId: number): string | 
         return `${runner.name} is disqualified.`;
     }
 
-    const expected = runner.lastCheckpoint + 1;
+    const expected = getExpectedCheckpointId(runner);
+    if (expected === -1) {
+        return `${runner.name} has already completed all checkpoints.`;
+    }
     if (checkpointId !== expected) {
         const expectedLabel = CP_LABELS[expected] ?? `CP${expected}`;
         const requestedLabel = CP_LABELS[checkpointId] ?? `CP${checkpointId}`;
@@ -261,12 +314,15 @@ function sendCheckpoint(runner: RunnerState, runnerIndex: number, checkpointId: 
 
             // Update local state optimistically
             runner.lastCheckpoint = checkpointId;
-            if (checkpointId === 0) runner.status = 'Running';
-            if (checkpointId === 1) runner.status = 'Running (CP1)';
-            if (checkpointId === 2) {
+            if (isLastCheckpoint(checkpointId)) {
                 runner.status = 'Finished';
                 const finishedCount = runners.filter(r => r.status.startsWith('Finished')).length;
                 runner.finishPosition = finishedCount;
+            } else if (checkpointId === checkpointDefs[0]?.id) {
+                runner.status = 'Running';
+            } else {
+                const cpLabel = CP_LABELS[checkpointId] ?? `CP${checkpointId}`;
+                runner.status = `Running (${cpLabel})`;
             }
         }
     });
@@ -312,15 +368,14 @@ function processCommand(cmd: string) {
         return;
     }
 
-    let checkpointId = -1;
-    if (action === 'start') checkpointId = 0;
-    else if (action === 'cp1') checkpointId = 1;
-    else if (action === 'finish') checkpointId = 2;
-    else {
+    // Resolve command to checkpoint ID dynamically
+    const matchedDef = checkpointDefs.find(d => d.command === action);
+    if (!matchedDef) {
         console.log('❌ Unknown command. Type "help" for available commands.');
         startPrompt();
         return;
     }
+    const checkpointId = matchedDef.id;
 
     if (!target) {
         console.log('❌ You must specify a target (e.g., "start all" or "finish 1").');

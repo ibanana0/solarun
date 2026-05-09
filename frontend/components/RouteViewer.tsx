@@ -81,7 +81,7 @@ function CheckpointPopupContent({ cp, runners }: { cp: CheckpointConfig; runners
       {runners.length === 0 ? (
         <div style={{ fontSize: 11, color: '#64748b', textAlign: 'center', padding: '4px 0' }}>No runners here yet</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto', paddingRight: 4 }}>
           {runners.map((r) => {
             const log = r.race_logs?.find((l) => l.checkpoint_id === cp.id);
             const timeStr = log
@@ -208,6 +208,16 @@ export default function RouteViewer({ checkpoints, routeCoordinates, runners = [
         }
         .leaflet-popup-tip-container {
           display: none !important;
+        }
+        .leaflet-popup-content ::-webkit-scrollbar {
+          width: 4px;
+        }
+        .leaflet-popup-content ::-webkit-scrollbar-track {
+          background: rgba(255,255,255,0.05);
+        }
+        .leaflet-popup-content ::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.2);
+          border-radius: 2px;
         }
       `}</style>
     </div>

@@ -104,7 +104,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                         .rpc();
                     console.log("Race started on-chain:", txSignature);
                     await supabase.from('race_events').update({ status: 'active', start_tx_signature: txSignature }).eq('id', event.id);
-                    showDialog("Berhasil!", `Race berhasil dimulai!\n\nTX: ${txSignature}`, "success");
+                    showDialog("Berhasil!", `Race berhasil dimulai!`, "success");
                     refetchEvent();
                 } catch (error: any) {
                     console.error("Failed to start race:", error);
