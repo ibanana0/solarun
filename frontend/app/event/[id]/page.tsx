@@ -2,23 +2,15 @@
 
 import { use, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Users, Trophy, Clock, Wallet, Loader2, PlayCircle, CheckCircle2, Copy, Check, AlertCircle, Info } from 'lucide-react';
+import { Loader2, PlayCircle, CheckCircle2, Copy, Check, AlertCircle, Info } from 'lucide-react';
 import { useEvent } from '@/hooks/useEvent';
 import { useRunners } from '@/hooks/useRunners';
 import { useAuth } from '@/hooks/useAuth';
 import { useProgram } from '@/hooks/useProgram';
 import { supabase } from '@/lib/supabase';
 import { PublicKey } from '@solana/web3.js';
-import { StatusBadge } from '@/components/StatusBadge';
 import { LeaderboardTable } from '@/components/LeaderboardTable';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -35,6 +27,26 @@ function formatDate(dateStr: string) {
         day: 'numeric', month: 'long', year: 'numeric',
         hour: '2-digit', minute: '2-digit',
     });
+}
+
+function formatDateShort(dateStr: string) {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }).toUpperCase()
+        + ' // '
+        + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+        + ' UTC';
+}
+
+function getStatusLabel(status: string): string {
+    const map: Record<string, string> = {
+        pending: 'PENDING', active: 'LIVE', completed: 'COMPLETED', settled: 'SETTLED',
+        Initialized: 'PENDING', Active: 'LIVE', Completed: 'COMPLETED', Settled: 'SETTLED',
+    };
+    return map[status] ?? status.toUpperCase();
+}
+
+function isLive(status: string) {
+    return status === 'active' || status === 'Active';
 }
 
 export default function EventPage({ params }: { params: Promise<{ id: string }> }) {
@@ -58,10 +70,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
         cancelText?: string;
         actionText?: string;
     }>({
-        open: false,
-        title: '',
-        description: '',
-        type: 'info'
+        open: false, title: '', description: '', type: 'info'
     });
 
     const showDialog = (title: string, description: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', onConfirm?: () => void, actionText = 'OK', cancelText?: string) => {
@@ -72,7 +81,6 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
 
     const handleStartRace = async () => {
         if (!program || !event) return;
-        
         showDialog(
             "Konfirmasi Start Race",
             "Apakah Anda yakin ingin memulai perlombaan ini? Sensor RFID akan mulai menerima tap.",
@@ -81,73 +89,49 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                 setIsStarting(true);
                 try {
                     const cleanEventId = event.id.replace(/-/g, '');
-                    
-                    // Derive Event PDA correctly
                     const [eventPda] = PublicKey.findProgramAddressSync(
                         [Buffer.from('event'), Buffer.from(cleanEventId)],
                         program.programId
                     );
-
                     const txSignature = await program.methods
                         .startRace(cleanEventId)
-                        .accounts({
-                            admin: program.provider.publicKey,
-                            event: eventPda,
-                        } as any)
+                        .accounts({ admin: program.provider.publicKey, event: eventPda } as any)
                         .rpc();
-                        
                     console.log("Race started on-chain:", txSignature);
-                    
-                    // Update Supabase to match on-chain state
-                    await supabase.from('race_events').update({ 
-                        status: 'active'
-                    }).eq('id', event.id);
-                    
+                    await supabase.from('race_events').update({ status: 'active' }).eq('id', event.id);
                     showDialog("Berhasil!", `Race berhasil dimulai!\n\nTX: ${txSignature}`, "success");
                     refetchEvent();
                 } catch (error: any) {
                     console.error("Failed to start race:", error);
                     let msg = error.message || String(error);
-                    
-                    // --- Fallback check for RPC Timeout ---
                     if (msg.includes('was not confirmed in 30.00 seconds')) {
                         try {
-                            console.log("Checking on-chain status after timeout...");
                             const cleanEventId = event.id.replace(/-/g, '');
                             const [eventPda] = PublicKey.findProgramAddressSync(
                                 [Buffer.from('event'), Buffer.from(cleanEventId)],
                                 program.programId
                             );
                             const onChainData = await program.account.event.fetch(eventPda);
-                            
                             if (onChainData.status.active || onChainData.status.completed || onChainData.status.settled) {
-                                console.log("Transaction actually succeeded on-chain!");
                                 await supabase.from('race_events').update({ status: 'active' }).eq('id', event.id);
-                                showDialog("Berhasil!", "Race berhasil dimulai (Berhasil di-recover dari timeout jaringan)!\n\nMohon tunggu sesaat, tampilan akan di-refresh.", "success");
+                                showDialog("Berhasil!", "Race berhasil dimulai (Berhasil di-recover dari timeout jaringan)!", "success");
                                 refetchEvent();
                                 return;
                             }
-                        } catch (fallbackErr) {
-                            console.error("Fallback check failed:", fallbackErr);
-                        }
+                        } catch (fallbackErr) { console.error("Fallback check failed:", fallbackErr); }
                     }
-
                     if (msg.includes('Custom: 2006')) {
                         msg = "Data event tidak kompatibel (Error 2006). Kemungkinan event ini dibuat dengan versi contract lama. Silakan buat event baru.";
                     }
                     showDialog("Gagal", `Gagal memulai race: ${msg}`, "error");
-                } finally {
-                    setIsStarting(false);
-                }
+                } finally { setIsStarting(false); }
             },
-            "Ya, Mulai Race",
-            "Batal"
+            "Ya, Mulai Race", "Batal"
         );
     };
 
     const handleFinalize = async () => {
         if (!program || !event) return;
-        
         showDialog(
             "Konfirmasi Finalisasi",
             "Apakah Anda yakin ingin memfinalisasi event? Ini akan memicu pembagian hadiah otomatis.",
@@ -156,78 +140,46 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                 setIsFinalizing(true);
                 try {
                     const cleanEventId = event.id.replace(/-/g, '');
-                    
-                    // Derive Event PDA correctly
                     const [eventPda] = PublicKey.findProgramAddressSync(
                         [Buffer.from('event'), Buffer.from(cleanEventId)],
                         program.programId
                     );
-
-                    // 1. Finalize on-chain
                     const txSignature = await program.methods
                         .completeRace(cleanEventId)
-                        .accounts({
-                            admin: program.provider.publicKey,
-                            event: eventPda,
-                        } as any)
+                        .accounts({ admin: program.provider.publicKey, event: eventPda } as any)
                         .rpc();
-                        
                     console.log("Race completed on-chain:", txSignature);
-
-                    // 2. Update Supabase Event Status
                     await supabase.from('race_events').update({ status: 'completed' }).eq('id', event.id);
-
-                    // 3. Mark non-finishers as disqualified (DNF)
-                    await supabase.from('runners')
-                        .update({ status: 'disqualified' })
-                        .eq('event_id', event.id)
-                        .neq('status', 'finished');
-
+                    await supabase.from('runners').update({ status: 'disqualified' }).eq('event_id', event.id).neq('status', 'finished');
                     showDialog("Berhasil!", `Event berhasil difinalisasi!\nPeserta yang belum finish telah dinyatakan DNF.\nSistem akan mulai membagikan hadiah.\n\nTX: ${txSignature}`, "success");
                     refetchEvent();
                 } catch (error: any) {
                     console.error("Failed to finalize race:", error);
                     let msg = error.message || String(error);
-
-                    // --- Fallback check for RPC Timeout ---
                     if (msg.includes('was not confirmed in 30.00 seconds')) {
                         try {
-                            console.log("Checking on-chain status after timeout...");
                             const cleanEventId = event.id.replace(/-/g, '');
                             const [eventPda] = PublicKey.findProgramAddressSync(
                                 [Buffer.from('event'), Buffer.from(cleanEventId)],
                                 program.programId
                             );
                             const onChainData = await program.account.event.fetch(eventPda);
-                            
                             if (onChainData.status.completed || onChainData.status.settled) {
-                                console.log("Transaction actually succeeded on-chain!");
                                 await supabase.from('race_events').update({ status: 'completed' }).eq('id', event.id);
-                                
-                                await supabase.from('runners')
-                                    .update({ status: 'disqualified' })
-                                    .eq('event_id', event.id)
-                                    .neq('status', 'finished');
-
-                                showDialog("Berhasil!", "Event berhasil difinalisasi (Berhasil di-recover dari timeout jaringan)!\nSistem akan mulai membagikan hadiah.", "success");
+                                await supabase.from('runners').update({ status: 'disqualified' }).eq('event_id', event.id).neq('status', 'finished');
+                                showDialog("Berhasil!", "Event berhasil difinalisasi (Berhasil di-recover dari timeout jaringan)!", "success");
                                 refetchEvent();
                                 return;
                             }
-                        } catch (fallbackErr) {
-                            console.error("Fallback check failed:", fallbackErr);
-                        }
+                        } catch (fallbackErr) { console.error("Fallback check failed:", fallbackErr); }
                     }
-
                     if (msg.includes('Custom: 2006')) {
                         msg = "Data event tidak kompatibel (Error 2006). Kemungkinan event ini dibuat dengan versi contract lama. Silakan buat event baru.";
                     }
                     showDialog("Gagal", `Gagal finalisasi race: ${msg}`, "error");
-                } finally {
-                    setIsFinalizing(false);
-                }
+                } finally { setIsFinalizing(false); }
             },
-            "Ya, Finalisasi",
-            "Batal"
+            "Ya, Finalisasi", "Batal"
         );
     };
 
@@ -236,194 +188,242 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
     const runningCount = runners?.filter((r) => r.status === 'running').length ?? 0;
     const poolSize = totalRunners * (event?.registration_fee_sol ?? 0);
 
+    /* ── Loading State ──────────────────────────────────────────── */
     if (eventLoading) {
         return (
-            <div className="container py-16 text-center text-muted-foreground">
-                Memuat data event...
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-muted-foreground">
+                <Loader2 className="h-12 w-12 animate-spin mb-4" />
+                <p className="font-label-caps text-label-caps uppercase">SYNCING_EVENT_DATA...</p>
             </div>
         );
     }
 
+    /* ── Error State ─────────────────────────────────────────────── */
     if (eventError || !event) {
         return (
-            <div className="container py-16 text-center space-y-4">
-                <p className="text-destructive font-medium">Event tidak ditemukan.</p>
-                <Button variant="outline" asChild>
-                    <Link href="/">
-                        <ArrowLeft className="mr-2 h-4 w-4" /> Kembali ke Home
-                    </Link>
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+                <p className="text-destructive font-label-caps text-label-caps uppercase">EVENT_NOT_FOUND</p>
+                <Button asChild variant="outline" className="rounded-none border-2 border-primary font-label-caps text-label-caps">
+                    <Link href="/">← BACK TO RACES</Link>
                 </Button>
             </div>
         );
     }
 
     const isEventOpen = event.status === 'active' || event.status === 'pending';
+    const statusLabel = getStatusLabel(event.status);
+    const live = isLive(event.status);
 
     return (
-        <div className="container py-8 space-y-8">
-            {/* Back */}
-            <Button variant="ghost" size="sm" asChild>
-                <Link href="/">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Semua Event
-                </Link>
-            </Button>
+        <div className="bg-background text-on-background selection:bg-primary selection:text-background min-h-screen flex flex-col">
+            <main className="flex-grow px-margin py-xl max-w-screen-2xl mx-auto w-full">
 
-            {/* Header */}
-            <div className="space-y-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <StatusBadge status={event.status} />
-                    {runningCount > 0 && (
-                        <span className="text-sm text-muted-foreground">
-                            {runningCount} peserta sedang berlari
-                        </span>
-                    )}
+                {/* ── Breadcrumbs & Event Info ───────────────────────── */}
+                <div className="mb-lg flex flex-col md:flex-row md:items-end justify-between gap-md">
+                    <div>
+                        <nav className="flex items-center gap-sm font-label-caps text-label-caps text-on-surface-variant mb-xs">
+                            <Link href="/" className="hover:text-primary transition-none">RACES</Link>
+                            <span className="material-symbols-outlined text-[12px]">chevron_right</span>
+                            <span className="text-primary">{event.name.toUpperCase()}</span>
+                        </nav>
+                        <div className="flex items-center gap-gutter flex-wrap">
+                            <h1 className="font-headline-lg text-headline-lg uppercase">{event.name.toUpperCase()}</h1>
+                            <div className={`border-2 border-primary px-sm py-xs flex items-center gap-xs ${live ? '' : 'opacity-60'}`}>
+                                {live && <span className="w-2 h-2 bg-primary block animate-pulse" />}
+                                <span className="font-label-caps text-label-caps">{statusLabel}</span>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(event.id);
+                                    setIsCopied(true);
+                                    setTimeout(() => setIsCopied(false), 2000);
+                                }}
+                                className="border-2 border-primary/20 hover:border-primary px-sm py-xs flex items-center gap-xs transition-none"
+                                title="Copy Event ID"
+                            >
+                                {isCopied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 opacity-50" />}
+                                <span className="font-label-caps text-[10px]">{isCopied ? 'COPIED' : 'COPY_ID'}</span>
+                            </button>
+                        </div>
+                        <p className="font-label-caps text-label-caps text-on-surface-variant mt-sm">
+                            {formatDateShort(event.start_time)}
+                        </p>
+                        {event.tx_signature && (
+                            <a
+                                href={`https://explorer.solana.com/tx/${event.tx_signature}?cluster=devnet`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-xs mt-sm font-label-caps text-[10px] text-blue-400 hover:text-blue-300 border border-blue-800 px-sm py-xs transition-none"
+                            >
+                                <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                                VERIFY ON BLOCKSCAN
+                            </a>
+                        )}
+                    </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    <h1 className="text-3xl font-bold tracking-tight">{event.name}</h1>
-                    <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-8 text-xs flex items-center gap-1"
-                        onClick={() => {
-                            navigator.clipboard.writeText(event.id);
-                            setIsCopied(true);
-                            setTimeout(() => setIsCopied(false), 2000);
-                        }}
-                    >
-                        {isCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                        {isCopied ? "Tersalin!" : "Copy Event ID"}
-                    </Button>
-                </div>
-                {event.tx_signature && (
-                    <a
-                        href={`https://explorer.solana.com/tx/${event.tx_signature}?cluster=devnet`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center text-xs font-mono text-blue-600 dark:text-blue-400 hover:underline bg-blue-50/50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 px-2.5 py-1 rounded-md w-fit transition-colors"
-                    >
-                        🔗 Verifikasi Event di Blockscan
-                    </a>
-                )}
-                {event.description && (
-                    <p className="text-muted-foreground max-w-xl">{event.description}</p>
-                )}
-                {isEventOpen && (
-                    <Button asChild>
-                        <Link href={`/register?event=${event.id}`}>Daftar Event Ini</Link>
-                    </Button>
-                )}
-                
-                {/* Creator Actions */}
-                {isCreator && (
-                    <div className="flex gap-2 mt-4 p-4 bg-secondary/30 rounded-lg border border-border">
-                        {event.status === 'pending' && (
-                            <Button onClick={handleStartRace} disabled={isStarting} className="bg-green-600 hover:bg-green-700 text-white">
-                                {isStarting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
-                                Start Race
+
+                {/* ── Prize Pool Banner ──────────────────────────────── */}
+                <section className="border-2 border-primary p-lg mb-xl flex flex-col md:flex-row justify-between items-center gap-lg">
+                    <div className="w-full md:w-auto">
+                        <p className="font-label-caps text-label-caps text-on-surface-variant mb-xs">TOTAL VAULT / PRIZE POOL</p>
+                        <div className="font-display-xl text-display-xl uppercase">
+                            {poolSize.toFixed(2)} <span className="text-on-surface-variant text-[40px]">USDC</span>
+                        </div>
+                    </div>
+                    <div className="w-full md:w-auto flex flex-col gap-sm">
+                        {isEventOpen && (
+                            <Button
+                                asChild
+                                className="w-full md:w-64 py-lg font-headline-md text-headline-md bg-primary text-background border-2 border-primary transition-none active:translate-y-1 h-auto rounded-none"
+                            >
+                                <Link href={`/register?event=${event.id}`}>REGISTER</Link>
                             </Button>
                         )}
-                        {event.status === 'active' && (
-                            <Button onClick={handleFinalize} disabled={isFinalizing} className="bg-blue-600 hover:bg-blue-700 text-white">
+                        {/* Creator Actions */}
+                        {isCreator && event.status === 'pending' && (
+                            <Button
+                                onClick={handleStartRace}
+                                disabled={isStarting}
+                                className="w-full md:w-64 py-md font-label-caps text-label-caps bg-transparent text-primary border-2 border-primary hover:bg-primary hover:text-background transition-none active:translate-y-1 h-auto rounded-none"
+                            >
+                                {isStarting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
+                                START RACE
+                            </Button>
+                        )}
+                        {isCreator && event.status === 'active' && (
+                            <Button
+                                onClick={handleFinalize}
+                                disabled={isFinalizing}
+                                className="w-full md:w-64 py-md font-label-caps text-label-caps bg-transparent text-primary border-2 border-primary hover:bg-primary hover:text-background transition-none active:translate-y-1 h-auto rounded-none"
+                            >
                                 {isFinalizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                                Finalize & Distribute Prizes
+                                FINALIZE & DISTRIBUTE
                             </Button>
                         )}
                     </div>
-                )}
-            </div>
+                </section>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5">
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                            <Users className="h-3 w-3" /> Peserta
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-2xl font-bold">
-                            {totalRunners}
-                            <span className="text-sm font-normal text-muted-foreground">/{event.max_participants}</span>
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                            <Wallet className="h-3 w-3" /> Prize Pool
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-2xl font-bold">{poolSize.toFixed(2)} SOL</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                            <Trophy className="h-3 w-3" /> Finish
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-2xl font-bold">{finishedCount}</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                            <Clock className="h-3 w-3" /> Mulai
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm font-medium leading-tight">{formatDate(event.start_time)}</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                            <Clock className="h-3 w-3" /> Selesai
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm font-medium leading-tight text-destructive">
-                            {formatDate(event.end_time)}
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
+                {/* ── Main Content Split ─────────────────────────────── */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-xl">
 
-            <Separator />
+                    {/* Left: Telemetry Map (Template / Placeholder) */}
+                    <div className="md:col-span-7 flex flex-col gap-gutter">
+                        <div className="flex justify-between items-end border-b-2 border-primary pb-sm">
+                            <h2 className="font-headline-md text-headline-md">LIVE TELEMETRY</h2>
+                            <span className="font-label-caps text-label-caps text-on-surface-variant">MAP_VIEW_01 // ASYNC_UPDATES</span>
+                        </div>
+                        {/* Map Placeholder — to be developed in the next phase */}
+                        <div className="border-2 border-primary h-[500px] relative bg-surface-container-lowest overflow-hidden">
+                            <img
+                                alt="Race Route Map"
+                                className="w-full h-full object-cover grayscale opacity-50"
+                                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCqjgCji-wRgJNyEaMNxDY7pBTkH0MAvw_wI5ztFeK73zg3rf3gH1Paps_jM8GOiivYib3HKwMGuhar7qI9jHaV--tOpq3NQJ3tFN3wTQigknMhqb_F6_NzqN5CTqVcmHAcqu1ECAYo7_YpDnuqKG_w5w-uzEWXM5hXBPARPTAMmCNhrUG8LckNnxYLDhS6bvncM-DHkQeq1gKhACmqBbYY9QVGLQK5A1qee0deDu6iQKqwyCDH0PB7eT1rzyeiVqhLN93GRH5URqw"
+                            />
+                            {/* Tech Overlays */}
+                            <div className="absolute top-md left-md border-2 border-primary bg-background p-sm font-label-caps text-label-caps">
+                                CP_01: START<br />
+                                CP_02: CHECKPOINT<br />
+                                CP_03: FINISH
+                            </div>
+                            <div className="absolute bottom-md right-md border-2 border-primary bg-background p-sm font-label-caps text-label-caps text-right">
+                                MAP_MODULE: PENDING<br />
+                                STATUS: TEMPLATE
+                            </div>
+                            {/* Center placeholder text */}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="border-2 border-primary bg-background/90 px-lg py-md text-center">
+                                    <span className="material-symbols-outlined text-[48px] block mb-sm" style={{ fontVariationSettings: "'FILL' 0" }}>map</span>
+                                    <p className="font-label-caps text-label-caps">DIGITAL MAP MODULE</p>
+                                    <p className="font-body-sm text-body-sm text-on-surface-variant mt-xs">COMING IN NEXT PHASE</p>
+                                </div>
+                            </div>
+                            {/* Marker examples */}
+                            <div className="absolute top-1/4 left-1/4 w-4 h-4 bg-primary border-2 border-background" />
+                            <div className="absolute top-1/2 left-1/2 w-4 h-4 bg-primary border-2 border-background" />
+                            <div className="absolute bottom-1/4 right-1/4 w-4 h-4 bg-primary border-2 border-background" />
+                        </div>
+                    </div>
 
-            {/* Leaderboard */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold">🏆 Leaderboard</h2>
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                        Live Realtime
-                    </span>
+                    {/* Right: Leaderboard */}
+                    <div className="md:col-span-5 flex flex-col gap-gutter">
+                        <div className="flex justify-between items-end border-b-2 border-primary pb-sm">
+                            <h2 className="font-headline-md text-headline-md">LEADERBOARD</h2>
+                            <span className="font-label-caps text-label-caps text-on-surface-variant flex items-center gap-xs">
+                                {live && <span className="w-2 h-2 bg-primary block animate-pulse" />}
+                                REALTIME
+                            </span>
+                        </div>
+                        <LeaderboardTable runners={runners ?? []} isLoading={runnersLoading} />
+                        {isEventOpen && (
+                            <Button
+                                asChild
+                                className="w-full py-md border-2 border-primary font-label-caps text-label-caps bg-transparent text-primary hover:bg-primary hover:text-on-primary transition-none active:translate-y-1 h-auto rounded-none"
+                            >
+                                <Link href={`/register?event=${event.id}`}>REGISTER AS PARTICIPANT</Link>
+                            </Button>
+                        )}
+                    </div>
                 </div>
-                <LeaderboardTable runners={runners ?? []} isLoading={runnersLoading} />
-            </div>
 
+                {/* ── Global Metrics Ticker ──────────────────────────── */}
+                <div className="mt-xl grid grid-cols-2 md:grid-cols-4 border-2 border-primary divide-x-2 divide-primary">
+                    <div className="p-lg">
+                        <p className="font-label-caps text-label-caps text-on-surface-variant">TOTAL_RUNNERS</p>
+                        <p className="font-data-lg text-data-lg">{totalRunners}</p>
+                    </div>
+                    <div className="p-lg">
+                        <p className="font-label-caps text-label-caps text-on-surface-variant">FINISHED</p>
+                        <p className="font-data-lg text-data-lg">{finishedCount}</p>
+                    </div>
+                    <div className="p-lg">
+                        <p className="font-label-caps text-label-caps text-on-surface-variant">RUNNING_NOW</p>
+                        <p className="font-data-lg text-data-lg">{runningCount}</p>
+                    </div>
+                    <div className="p-lg">
+                        <p className="font-label-caps text-label-caps text-on-surface-variant">ENTRY_FEE</p>
+                        <p className="font-data-lg text-data-lg">{event.registration_fee_sol} USDC</p>
+                    </div>
+                </div>
+            </main>
+
+            {/* ── Footer ────────────────────────────────────────────── */}
+            <footer className="flex flex-col md:flex-row justify-between items-center w-full px-margin py-lg gap-gutter border-t-2 border-primary mt-xl bg-background">
+                <div className="font-body-sm text-body-sm text-on-surface-variant uppercase opacity-60">
+                    © 2026 SOLARUN PROTOCOL // ALL PERFORMANCE DATA ON-CHAIN
+                </div>
+                <div className="flex gap-lg items-center flex-wrap justify-center">
+                    <a className="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">DOCS</a>
+                    <a className="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="https://github.com/Ibanana/solarun" target="_blank" rel="noreferrer">GITHUB</a>
+                    <a className="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">AUDIT</a>
+                    <a className="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">PRIVACY</a>
+                </div>
+            </footer>
+
+            {/* ── Alert Dialog (unchanged logic) ────────────────────── */}
             <AlertDialog open={dialog.open} onOpenChange={(open) => setDialog(prev => ({ ...prev, open }))}>
-                <AlertDialogContent>
+                <AlertDialogContent className="rounded-none border-2 border-primary bg-background font-space-mono">
                     <AlertDialogHeader>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 mb-2">
                             {dialog.type === 'success' && <CheckCircle2 className="h-5 w-5 text-green-500" />}
                             {dialog.type === 'error' && <AlertCircle className="h-5 w-5 text-destructive" />}
                             {dialog.type === 'warning' && <AlertCircle className="h-5 w-5 text-orange-500" />}
                             {dialog.type === 'info' && <Info className="h-5 w-5 text-blue-500" />}
-                            <AlertDialogTitle>{dialog.title}</AlertDialogTitle>
+                            <AlertDialogTitle className="font-anton uppercase tracking-widest">{dialog.title}</AlertDialogTitle>
                         </div>
-                        <AlertDialogDescription>
+                        <AlertDialogDescription className="text-on-surface-variant uppercase text-[12px] tracking-wider leading-relaxed whitespace-pre-line">
                             {dialog.description}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
+                    <AlertDialogFooter className="mt-6 gap-4">
                         {dialog.cancelText && (
-                            <AlertDialogCancel>{dialog.cancelText}</AlertDialogCancel>
+                            <AlertDialogCancel className="rounded-none border-2 border-primary px-8 py-2 font-label-caps text-[12px] uppercase hover:bg-primary hover:text-background transition-none">
+                                {dialog.cancelText}
+                            </AlertDialogCancel>
                         )}
-                        <AlertDialogAction onClick={() => dialog.onConfirm?.()}>
+                        <AlertDialogAction
+                            onClick={() => dialog.onConfirm?.()}
+                            className="rounded-none bg-primary text-background px-8 py-2 font-label-caps text-[12px] uppercase hover:bg-transparent hover:text-primary border-2 border-primary transition-none"
+                        >
                             {dialog.actionText}
                         </AlertDialogAction>
                     </AlertDialogFooter>

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SOLARUN // EVENT LIVE HUB</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Space+Mono:wght@400;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed-dim": "#c6c6c7",
+                    "surface-container-high": "#2a2a2a",
+                    "primary-container": "#e2e2e2",
+                    "on-secondary-container": "#b5b5b5",
+                    "primary-fixed-dim": "#c6c6c7",
+                    "on-error-container": "#ffdad6",
+                    "on-tertiary-container": "#636565",
+                    "on-secondary": "#303030",
+                    "surface-container-lowest": "#0e0e0e",
+                    "surface": "#141313",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "secondary-fixed-dim": "#c6c6c6",
+                    "on-primary-fixed-variant": "#454747",
+                    "on-error": "#690005",
+                    "on-primary-container": "#636565",
+                    "on-secondary-fixed": "#1b1b1b",
+                    "surface-container-highest": "#353434",
+                    "surface-variant": "#353434",
+                    "secondary-fixed": "#e2e2e2",
+                    "surface-bright": "#3a3939",
+                    "on-surface": "#e5e2e1",
+                    "secondary": "#c6c6c6",
+                    "on-tertiary": "#2f3131",
+                    "on-primary": "#2f3131",
+                    "error-container": "#93000a",
+                    "on-surface-variant": "#c4c7c8",
+                    "primary": "#ffffff",
+                    "secondary-container": "#474747",
+                    "tertiary-container": "#e2e2e2",
+                    "on-tertiary-fixed-variant": "#454747",
+                    "error": "#ffb4ab",
+                    "tertiary": "#ffffff",
+                    "on-primary-fixed": "#1a1c1c",
+                    "surface-tint": "#c6c6c7",
+                    "surface-container": "#201f1f",
+                    "background": "#141313",
+                    "surface-dim": "#141313",
+                    "surface-container-low": "#1c1b1b",
+                    "inverse-primary": "#5d5f5f",
+                    "outline-variant": "#444748",
+                    "inverse-on-surface": "#313030",
+                    "tertiary-fixed": "#e2e2e2",
+                    "on-secondary-fixed-variant": "#474747",
+                    "primary-fixed": "#e2e2e2",
+                    "on-background": "#e5e2e1",
+                    "outline": "#8e9192",
+                    "inverse-surface": "#e5e2e1"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0px",
+                    "lg": "0px",
+                    "xl": "0px",
+                    "full": "0px"
+            },
+            "spacing": {
+                    "sm": "8px",
+                    "md": "16px",
+                    "margin": "40px",
+                    "gutter": "24px",
+                    "unit": "4px",
+                    "xl": "64px",
+                    "xs": "4px",
+                    "lg": "32px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Anton"],
+                    "label-caps": ["Space Mono"],
+                    "display-xl": ["Anton"],
+                    "body-sm": ["Space Mono"],
+                    "headline-md": ["Anton"],
+                    "data-lg": ["Space Mono"],
+                    "body-lg": ["Space Mono"]
+            },
+            "fontSize": {
+                    "headline-lg": ["64px", {"lineHeight": "60px", "letterSpacing": "-0.02em", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                    "display-xl": ["120px", {"lineHeight": "100px", "letterSpacing": "-0.04em", "fontWeight": "400"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "headline-md": ["32px", {"lineHeight": "32px", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "data-lg": ["24px", {"lineHeight": "24px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "letterSpacing": "0em", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #141313;
+            color: #ffffff;
+            font-family: 'Space Mono', monospace;
+        }
+        /* Rigid Industrial Grid & Borders */
+        .border-heavy { border: 2px solid #ffffff; }
+        .border-b-heavy { border-bottom: 2px solid #ffffff; }
+        .border-t-heavy { border-top: 2px solid #ffffff; }
+        .border-r-heavy { border-right: 2px solid #ffffff; }
+        .border-l-heavy { border-left: 2px solid #ffffff; }
+
+        .btn-primary {
+            background: transparent;
+            color: #ffffff;
+            border: 2px solid #ffffff;
+            transition: none;
+        }
+        .btn-primary:hover {
+            background: #ffffff;
+            color: #141313;
+        }
+        .btn-primary:active {
+            transform: translateY(4px);
+        }
+
+        /* Hard Offset Effect */
+        .offset-shadow {
+            position: relative;
+        }
+        .offset-shadow::after {
+            content: '';
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            width: 100%;
+            height: 100%;
+            border: 2px solid #ffffff;
+            z-index: -1;
+        }
+    </style>
+</head>
+<body class="dark bg-background text-on-background min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-margin py-md h-24 border-b-2 border-primary fixed top-0 z-50 bg-background">
+<div class="font-headline-lg text-headline-lg text-primary tracking-tighter uppercase">SOLARUN</div>
+<nav class="hidden md:flex gap-lg items-center">
+<a class="font-label-caps text-label-caps text-primary border-b-2 border-primary pb-1" href="#">RACES</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary" href="#">TELEMETRY</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary" href="#">VAULTS</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary" href="#">GOVERNANCE</a>
+</nav>
+<button class="font-label-caps text-label-caps px-md py-sm border-heavy btn-primary">
+            CONNECT WALLET
+        </button>
+</header>
+<main class="mt-24 flex-grow px-margin py-xl max-w-screen-2xl mx-auto w-full">
+<!-- Breadcrumbs & Event Info -->
+<div class="mb-lg flex flex-col md:flex-row md:items-end justify-between gap-md">
+<div>
+<nav class="flex items-center gap-sm font-label-caps text-label-caps text-on-surface-variant mb-xs">
+<span>RACES</span>
+<span class="material-symbols-outlined text-[12px]">chevron_right</span>
+<span class="text-primary">DOWNTOWN 10K</span>
+</nav>
+<div class="flex items-center gap-gutter">
+<h1 class="font-headline-lg text-headline-lg uppercase">DOWNTOWN 10K</h1>
+<div class="border-heavy px-sm py-xs flex items-center gap-xs">
+<span class="w-2 h-2 bg-primary block animate-pulse"></span>
+<span class="font-label-caps text-label-caps">LIVE</span>
+</div>
+</div>
+<p class="font-label-caps text-label-caps text-on-surface-variant mt-sm">OCT 24 // 08:00 UTC</p>
+</div>
+</div>
+<!-- Prize Pool Banner -->
+<section class="border-heavy p-lg mb-xl flex flex-col md:flex-row justify-between items-center gap-lg">
+<div class="w-full md:w-auto">
+<p class="font-label-caps text-label-caps text-on-surface-variant mb-xs">TOTAL VAULT / PRIZE POOL</p>
+<div class="font-display-xl text-display-xl uppercase">1,250.00 SOL</div>
+</div>
+<div class="w-full md:w-auto">
+<button class="w-full md:w-64 py-lg font-headline-md text-headline-md bg-primary text-background border-heavy transition-none active:translate-y-1">
+                    CLAIM PAYOUT
+                </button>
+</div>
+</section>
+<!-- Main Content Split -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-xl">
+<!-- Left: Telemetry Map -->
+<div class="md:col-span-7 flex flex-col gap-gutter">
+<div class="flex justify-between items-end border-b-heavy pb-sm">
+<h2 class="font-headline-md text-headline-md">LIVE TELEMETRY</h2>
+<span class="font-label-caps text-label-caps text-on-surface-variant">MAP_VIEW_01 // ASYNC_UPDATES</span>
+</div>
+<div class="border-heavy h-[500px] relative bg-surface-container-lowest overflow-hidden">
+<img alt="Race Route Map" class="w-full h-full object-cover grayscale opacity-50" data-alt="A high-contrast grayscale top-down satellite map of a dense urban city grid. The imagery is desaturated to pure black and white tones with architectural details highlighted. Superimposed on the map is a thick, sharp white line indicating a race route with geometric checkpoint markers and technical data overlays in a minimalist UI style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCqjgCji-wRgJNyEaMNxDY7pBTkH0MAvw_wI5ztFeK73zg3rf3gH1Paps_jM8GOiivYib3HKwMGuhar7qI9jHaV--tOpq3NQJ3tFN3wTQigknMhqb_F6_NzqN5CTqVcmHAcqu1ECAYo7_YpDnuqKG_w5w-uzEWXM5hXBPARPTAMmCNhrUG8LckNnxYLDhS6bvncM-DHkQeq1gKhACmqBbYY9QVGLQK5A1qee0deDu6iQKqwyCDH0PB7eT1rzyeiVqhLN93GRH5URqw"/>
+<!-- Tech Overlays -->
+<div class="absolute top-md left-md border-heavy bg-background p-sm font-label-caps text-label-caps">
+                        CP_01: SYNCED<br/>
+                        CP_02: ACTIVE
+                    </div>
+<div class="absolute bottom-md right-md border-heavy bg-background p-sm font-label-caps text-label-caps text-right">
+                        LAT: 40.7128° N<br/>
+                        LNG: 74.0060° W
+                    </div>
+<!-- Marker Example -->
+<div class="absolute top-1/2 left-1/3 w-4 h-4 bg-primary border-2 border-background"></div>
+</div>
+</div>
+<!-- Right: Leaderboard Table -->
+<div class="md:col-span-5 flex flex-col gap-gutter">
+<div class="flex justify-between items-end border-b-heavy pb-sm">
+<h2 class="font-headline-md text-headline-md">LEADERBOARD</h2>
+<span class="font-label-caps text-label-caps text-on-surface-variant">BLOCK: 294,002,110</span>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full border-collapse">
+<thead>
+<tr class="border-b-heavy">
+<th class="text-left font-label-caps text-label-caps py-md px-sm text-on-surface-variant">RANK</th>
+<th class="text-left font-label-caps text-label-caps py-md px-sm text-on-surface-variant">RUNNER</th>
+<th class="text-right font-label-caps text-label-caps py-md px-sm text-on-surface-variant">DIST</th>
+<th class="text-right font-label-caps text-label-caps py-md px-sm text-on-surface-variant">PACE</th>
+<th class="text-right font-label-caps text-label-caps py-md px-sm text-on-surface-variant">STATUS</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm">
+<tr class="border-b-2 border-surface-container-highest bg-white text-black">
+<td class="py-md px-sm font-bold">01</td>
+<td class="py-md px-sm">SOLx...8f2</td>
+<td class="py-md px-sm text-right">4.8 KM</td>
+<td class="py-md px-sm text-right">3'42"</td>
+<td class="py-md px-sm text-right font-bold">PENDING</td>
+</tr>
+<tr class="border-b-2 border-surface-container-highest">
+<td class="py-md px-sm">02</td>
+<td class="py-md px-sm">SOLx...4d9</td>
+<td class="py-md px-sm text-right">4.5 KM</td>
+<td class="py-md px-sm text-right">3'45"</td>
+<td class="py-md px-sm text-right">PENDING</td>
+</tr>
+<tr class="border-b-2 border-surface-container-highest">
+<td class="py-md px-sm">03</td>
+<td class="py-md px-sm">SOLx...1a2</td>
+<td class="py-md px-sm text-right">4.2 KM</td>
+<td class="py-md px-sm text-right">3'50"</td>
+<td class="py-md px-sm text-right">PENDING</td>
+</tr>
+<tr class="border-b-2 border-surface-container-highest">
+<td class="py-md px-sm">04</td>
+<td class="py-md px-sm">SOLx...bb8</td>
+<td class="py-md px-sm text-right">3.9 KM</td>
+<td class="py-md px-sm text-right">4'02"</td>
+<td class="py-md px-sm text-right">PENDING</td>
+</tr>
+<tr class="border-b-2 border-surface-container-highest">
+<td class="py-md px-sm">05</td>
+<td class="py-md px-sm">SOLx...99c</td>
+<td class="py-md px-sm text-right">3.7 KM</td>
+<td class="py-md px-sm text-right">4'10"</td>
+<td class="py-md px-sm text-right">PENDING</td>
+</tr>
+</tbody>
+</table>
+</div>
+<button class="w-full py-md border-heavy font-label-caps text-label-caps btn-primary">
+                    VIEW ALL PARTICIPANTS
+                </button>
+</div>
+</div>
+<!-- Global Metrics Ticker -->
+<div class="mt-xl grid grid-cols-2 md:grid-cols-4 border-heavy divide-x-2 divide-primary">
+<div class="p-lg">
+<p class="font-label-caps text-label-caps text-on-surface-variant">AVG_HEART_RATE</p>
+<p class="font-data-lg text-data-lg">164 BPM</p>
+</div>
+<div class="p-lg">
+<p class="font-label-caps text-label-caps text-on-surface-variant">BLOCK_LATENCY</p>
+<p class="font-data-lg text-data-lg">420 MS</p>
+</div>
+<div class="p-lg">
+<p class="font-label-caps text-label-caps text-on-surface-variant">TOTAL_KM_CHAIN</p>
+<p class="font-data-lg text-data-lg">12,409.2</p>
+</div>
+<div class="p-lg">
+<p class="font-label-caps text-label-caps text-on-surface-variant">VALIDATORS_ON</p>
+<p class="font-data-lg text-data-lg">2,142</p>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="flex flex-col md:flex-row justify-between items-center w-full px-margin py-lg gap-gutter border-t-2 border-primary mt-xl bg-background">
+<div class="font-body-sm text-body-sm text-on-surface-variant uppercase">
+            © 2024 SOLARUN PROTOCOL // ALL PERFORMANCE DATA ON-CHAIN
+        </div>
+<div class="flex gap-lg items-center">
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary" href="#">DOCS</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary" href="#">GITHUB</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary" href="#">AUDIT</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary" href="#">PRIVACY</a>
+</div>
+</footer>
+</body></html>
