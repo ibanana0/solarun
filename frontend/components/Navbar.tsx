@@ -216,6 +216,9 @@ export function Navbar() {
                 {authenticated && (
                     <Link className="font-label-caps text-[12px] text-on-surface-variant hover:text-primary transition-none uppercase tracking-widest" href="/register">REGISTER</Link>
                 )}
+                {authenticated && (
+                    <Link className="font-label-caps text-[12px] text-on-surface-variant hover:text-primary transition-none uppercase tracking-widest" href="/profile">PROFILE</Link>
+                )}
             </nav>
 
             <div className="flex items-center gap-4">

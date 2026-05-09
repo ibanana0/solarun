@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Space+Mono:wght@400;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-variant": "#353434",
+                    "primary": "#ffffff",
+                    "outline": "#8e9192",
+                    "on-primary-container": "#636565",
+                    "primary-fixed-dim": "#c6c6c7",
+                    "on-secondary": "#303030",
+                    "on-error-container": "#ffdad6",
+                    "surface-tint": "#c6c6c7",
+                    "inverse-primary": "#5d5f5f",
+                    "surface-dim": "#141313",
+                    "surface-container-highest": "#353434",
+                    "on-tertiary-fixed-variant": "#454747",
+                    "secondary": "#c6c6c6",
+                    "outline-variant": "#444748",
+                    "surface-container": "#201f1f",
+                    "tertiary": "#ffffff",
+                    "on-tertiary-container": "#636565",
+                    "surface-container-low": "#1c1b1b",
+                    "on-tertiary": "#2f3131",
+                    "on-secondary-fixed": "#1b1b1b",
+                    "tertiary-fixed": "#e2e2e2",
+                    "on-error": "#690005",
+                    "on-background": "#e5e2e1",
+                    "on-primary": "#2f3131",
+                    "inverse-surface": "#e5e2e1",
+                    "primary-container": "#e2e2e2",
+                    "secondary-fixed": "#e2e2e2",
+                    "on-secondary-container": "#b5b5b5",
+                    "error": "#ffb4ab",
+                    "tertiary-fixed-dim": "#c6c6c7",
+                    "background": "#141313",
+                    "secondary-fixed-dim": "#c6c6c6",
+                    "surface-container-lowest": "#0e0e0e",
+                    "surface-container-high": "#2a2a2a",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "surface-bright": "#3a3939",
+                    "error-container": "#93000a",
+                    "secondary-container": "#474747",
+                    "on-primary-fixed-variant": "#454747",
+                    "on-surface": "#e5e2e1",
+                    "tertiary-container": "#e2e2e2",
+                    "inverse-on-surface": "#313030",
+                    "on-primary-fixed": "#1a1c1c",
+                    "on-surface-variant": "#c4c7c8",
+                    "surface": "#141313",
+                    "primary-fixed": "#e2e2e2",
+                    "on-secondary-fixed-variant": "#474747"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0px",
+                    "lg": "0px",
+                    "xl": "0px",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "margin": "40px",
+                    "xs": "4px",
+                    "sm": "8px",
+                    "xl": "64px",
+                    "md": "16px",
+                    "gutter": "24px",
+                    "lg": "32px"
+            },
+            "fontFamily": {
+                    "data-lg": ["Space Mono"],
+                    "headline-md": ["Anton"],
+                    "headline-lg": ["Anton"],
+                    "body-lg": ["Space Mono"],
+                    "label-caps": ["Space Mono"],
+                    "display-xl": ["Anton"],
+                    "body-sm": ["Space Mono"]
+            },
+            "fontSize": {
+                    "data-lg": ["24px", {"lineHeight": "24px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-md": ["32px", {"lineHeight": "32px", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "headline-lg": ["64px", {"lineHeight": "60px", "letterSpacing": "-0.02em", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                    "display-xl": ["120px", {"lineHeight": "100px", "letterSpacing": "-0.04em", "fontWeight": "400"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        input, textarea, select {
+            background-color: transparent !important;
+            border-radius: 0px !important;
+        }
+        input:focus, textarea:focus {
+            outline: none !important;
+            ring: 0 !important;
+            border-color: #ffffff !important;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-sm selection:bg-primary selection:text-background">
+<!-- TopAppBar -->
+<header class="bg-background dark:bg-background border-b-2 border-primary flex justify-between items-center w-full px-margin py-md h-24 fixed top-0 z-50">
+<div class="font-headline-lg text-headline-lg text-primary tracking-tighter uppercase">SOLARUN</div>
+<nav class="hidden md:flex gap-lg items-center">
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">RACES</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">TELEMETRY</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">VAULTS</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">GOVERNANCE</a>
+</nav>
+<button class="font-label-caps text-label-caps border-2 border-primary px-lg py-sm hover:bg-primary hover:text-background transition-none active:translate-y-1">
+            CONNECT WALLET
+        </button>
+</header>
+<main class="pt-32 pb-xl px-margin max-w-7xl mx-auto">
+<!-- Hero Section -->
+<div class="mb-xl">
+<h1 class="font-display-xl text-display-xl uppercase leading-[0.8] mb-md">DEPLOY_NEW<br/>_PROTOCOL</h1>
+<div class="flex items-center gap-sm">
+<div class="bg-primary text-background px-md py-xs font-label-caps text-label-caps">STABLE_VERSION_2.4.0</div>
+<div class="border-2 border-primary px-md py-xs font-label-caps text-label-caps">ON-CHAIN_VERIFIED</div>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-xl">
+<!-- Left Column: Primary Config -->
+<div class="lg:col-span-7 space-y-xl">
+<section class="space-y-lg">
+<div class="flex flex-col gap-sm">
+<label class="font-label-caps text-label-caps text-on-surface-variant">CREATOR_ADDRESS</label>
+<input class="w-full border-2 border-outline-variant p-md font-body-sm text-on-surface-variant cursor-not-allowed" readonly="" type="text" value="8xY2...Jp4kL9Z2nQ7vM1wR"/>
+</div>
+<div class="flex flex-col gap-sm">
+<label class="font-label-caps text-label-caps">EVENT_NAME</label>
+<input class="w-full border-2 border-primary p-md font-body-lg text-primary focus:border-primary" placeholder="ENTER_RACE_IDENTIFIER" type="text"/>
+</div>
+<div class="flex flex-col gap-sm">
+<label class="font-label-caps text-label-caps">RACE_SPECIFICATIONS</label>
+<textarea class="w-full border-2 border-primary p-md font-body-sm text-primary focus:border-primary resize-none" placeholder="DEFINE_OBJECTIVES_AND_REWARDS" rows="6"></textarea>
+</div>
+<div class="grid grid-cols-3 gap-gutter">
+<div class="flex flex-col gap-sm">
+<label class="font-label-caps text-label-caps">GENESIS_DATE</label>
+<input class="w-full border-2 border-primary p-md font-body-sm text-primary" type="date"/>
+</div>
+<div class="flex flex-col gap-sm">
+<label class="font-label-caps text-label-caps">START_TIME_UTC</label>
+<input class="w-full border-2 border-primary p-md font-body-sm text-primary" type="time"/>
+</div>
+<div class="flex flex-col gap-sm">
+<label class="font-label-caps text-label-caps">EVENT_DURATION</label>
+<input class="w-full border-2 border-primary p-md font-body-sm text-primary" placeholder="hh:mm" type="text"/>
+</div>
+</div>
+<div class="flex flex-col gap-sm">
+<label class="font-label-caps text-label-caps">PROTOCOL_FEE_SOL</label>
+<div class="relative">
+<input class="w-full border-2 border-primary p-md font-data-lg text-primary" placeholder="0.00" step="0.1" type="number"/>
+<span class="absolute right-md top-1/2 -translate-y-1/2 font-label-caps text-label-caps opacity-50">SOL</span>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column: Geospatial & Checkpoints -->
+<div class="lg:col-span-5 space-y-xl">
+<section class="border-2 border-primary p-lg space-y-lg"><h3 class="font-headline-md text-headline-md border-b-2 border-primary pb-sm uppercase">GEOSPATIAL_CONFIG</h3>
+<div class="aspect-video bg-surface-container border-2 border-primary relative overflow-hidden group cursor-crosshair">
+<img class="w-full h-full object-cover grayscale opacity-40" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCSk6O-6VDPIQ9PnzIxT1FiN8U8TOWA-QScH_Nh7bZXr-MzddBWLMUcp_sTOzGqfXyLkMoPiBOtCM99m264XgIB_9v1gHc_8OiRtIUoq0Qv_k9q5yJVgl1hb1oLy-FzMY_TARid2U59uLXrl6UajZZqH2gLo_hoAEFZNUcL8WEoR3Mzv_UJ4YTkqJOYK6PkYsTP-Y8Lr-FoC5-iVOM6W2g83XSd7BHZnIm71LgcMo_IGLJ7He8QyqMg-xOmZykfX69NH6EP3Izxxj0"/>
+<div class="absolute inset-0 flex items-center justify-center bg-background/20 group-hover:bg-transparent transition-colors">
+<button class="border-2 border-primary bg-background px-lg py-md font-label-caps text-label-caps hover:bg-primary hover:text-background transition-none">
+            UPLOAD_GPX_ROUTE
+        </button>
+</div>
+<div class="absolute top-10 left-10 w-3 h-3 bg-primary animate-pulse"></div>
+<div class="absolute bottom-20 right-20 w-3 h-3 border-2 border-primary"></div>
+</div>
+<div class="space-y-md">
+<div class="flex flex-col gap-sm">
+<label class="font-label-caps text-label-caps">ACTIVE_CHECKPOINTS</label>
+<div class="border-2 border-outline-variant p-sm flex justify-between items-center">
+<span class="font-body-sm text-xs">START_LINE: 34.05° N, 118.24° W</span>
+<span class="material-symbols-outlined text-primary text-sm">verified</span>
+</div>
+</div>
+<div class="flex gap-sm">
+<input class="flex-grow border-2 border-primary p-sm font-body-sm text-xs" placeholder="ADD_LAT_LONG_COORDINATES" type="text"/>
+<button class="bg-primary text-background px-md py-sm font-label-caps text-xs">ADD</button>
+</div>
+</div></section>
+</div>
+</div>
+<!-- Primary Action -->
+<div class="mt-xl">
+<button class="w-full bg-background border-2 border-primary py-xl font-display-xl text-headline-lg hover:bg-primary hover:text-background transition-none active:translate-y-2 group flex items-center justify-between px-xl">
+<span>INITIALIZE EVENT</span>
+<span class="material-symbols-outlined text-[64px]" data-icon="terminal">terminal</span>
+</button>
+<p class="font-label-caps text-label-caps text-center mt-md text-on-surface-variant">WARNING: THIS ACTION IS IRREVERSIBLE AND WILL CONSUME 0.05 SOL GAS</p>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-background dark:bg-background border-t-2 border-primary flex flex-col md:flex-row justify-between items-center w-full px-margin py-lg gap-gutter mt-xl">
+<div class="font-headline-md text-headline-md text-primary">SOLARUN</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant text-center md:text-left">
+            © 2024 SOLARUN PROTOCOL // ALL PERFORMANCE DATA ON-CHAIN
+        </div>
+<div class="flex gap-lg">
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">DOCS</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">GITHUB</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">AUDIT</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-none" href="#">PRIVACY</a>
+</div>
+</footer>
+</body></html>

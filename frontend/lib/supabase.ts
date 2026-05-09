@@ -6,18 +6,34 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Database types
+export interface CheckpointConfig {
+    id: number;
+    label: string;
+    lat: number;
+    lng: number;
+}
+
+export interface RouteCoordinate {
+    lat: number;
+    lng: number;
+}
+
 export interface RaceEvent {
     id: string;
     name: string;
     description: string;
     status: 'pending' | 'active' | 'completed' | 'settled' | 'Initialized' | 'Active' | 'Completed' | 'Settled';
     start_time: string;
+    end_time?: string;
     duration_hours: number;
     registration_fee_sol: number;
     max_participants: number;
     vault_address: string | null;
     creator_wallet: string | null;
     tx_signature?: string | null;
+    checkpoints_config?: CheckpointConfig[] | null;
+    route_coordinates?: RouteCoordinate[] | null;
+    route_distance_meters?: number | null;
     created_at: string;
 }
 

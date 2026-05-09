@@ -6,12 +6,12 @@ import { useAnchorProvider } from './useAnchorProvider';
 import IDL from '@/lib/solarun_temp.json';
 import { SolarunTemp } from '@/lib/solarun_temp';
 
-export function useProgram() {
+export function useProgram(): Program<SolarunTemp> | null {
     const provider = useAnchorProvider();
 
     const program = useMemo(() => {
         if (!provider) return null;
-        return new Program(IDL as SolarunTemp, provider);
+        return new Program<SolarunTemp>(IDL as any, provider);
     }, [provider]);
 
     return program;

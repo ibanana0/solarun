@@ -10,6 +10,11 @@ import { useProgram } from '@/hooks/useProgram';
 import { supabase } from '@/lib/supabase';
 import { PublicKey } from '@solana/web3.js';
 import { LeaderboardTable } from '@/components/LeaderboardTable';
+import dynamic from 'next/dynamic';
+const RouteViewer = dynamic(() => import('@/components/RouteViewer'), {
+    ssr: false,
+    loading: () => <div className="h-[500px] w-full animate-pulse bg-muted flex items-center justify-center border-2 border-primary"><p className="font-mono text-muted-foreground">Memuat Peta...</p></div>
+});
 import { Button } from '@/components/ui/button';
 import {
     AlertDialog,
@@ -306,41 +311,17 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                 {/* ── Main Content Split ─────────────────────────────── */}
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-xl">
 
-                    {/* Left: Telemetry Map (Template / Placeholder) */}
+                    {/* Left: Telemetry Map */}
                     <div className="md:col-span-7 flex flex-col gap-gutter">
                         <div className="flex justify-between items-end border-b-2 border-primary pb-sm">
                             <h2 className="font-headline-md text-headline-md">LIVE TELEMETRY</h2>
                             <span className="font-label-caps text-label-caps text-on-surface-variant">MAP_VIEW_01 // ASYNC_UPDATES</span>
                         </div>
-                        {/* Map Placeholder — to be developed in the next phase */}
-                        <div className="border-2 border-primary h-[500px] relative bg-surface-container-lowest overflow-hidden">
-                            <img
-                                alt="Race Route Map"
-                                className="w-full h-full object-cover grayscale opacity-50"
-                                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCqjgCji-wRgJNyEaMNxDY7pBTkH0MAvw_wI5ztFeK73zg3rf3gH1Paps_jM8GOiivYib3HKwMGuhar7qI9jHaV--tOpq3NQJ3tFN3wTQigknMhqb_F6_NzqN5CTqVcmHAcqu1ECAYo7_YpDnuqKG_w5w-uzEWXM5hXBPARPTAMmCNhrUG8LckNnxYLDhS6bvncM-DHkQeq1gKhACmqBbYY9QVGLQK5A1qee0deDu6iQKqwyCDH0PB7eT1rzyeiVqhLN93GRH5URqw"
+                        <div className="h-[500px]">
+                            <RouteViewer
+                                checkpoints={event?.checkpoints_config || []}
+                                routeCoordinates={event?.route_coordinates || []}
                             />
-                            {/* Tech Overlays */}
-                            <div className="absolute top-md left-md border-2 border-primary bg-background p-sm font-label-caps text-label-caps">
-                                CP_01: START<br />
-                                CP_02: CHECKPOINT<br />
-                                CP_03: FINISH
-                            </div>
-                            <div className="absolute bottom-md right-md border-2 border-primary bg-background p-sm font-label-caps text-label-caps text-right">
-                                MAP_MODULE: PENDING<br />
-                                STATUS: TEMPLATE
-                            </div>
-                            {/* Center placeholder text */}
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="border-2 border-primary bg-background/90 px-lg py-md text-center">
-                                    <span className="material-symbols-outlined text-[48px] block mb-sm" style={{ fontVariationSettings: "'FILL' 0" }}>map</span>
-                                    <p className="font-label-caps text-label-caps">DIGITAL MAP MODULE</p>
-                                    <p className="font-body-sm text-body-sm text-on-surface-variant mt-xs">COMING IN NEXT PHASE</p>
-                                </div>
-                            </div>
-                            {/* Marker examples */}
-                            <div className="absolute top-1/4 left-1/4 w-4 h-4 bg-primary border-2 border-background" />
-                            <div className="absolute top-1/2 left-1/2 w-4 h-4 bg-primary border-2 border-background" />
-                            <div className="absolute bottom-1/4 right-1/4 w-4 h-4 bg-primary border-2 border-background" />
                         </div>
                     </div>
 

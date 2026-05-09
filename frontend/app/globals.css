@@ -94,3 +94,34 @@
     transform: translate(2px, 2px);
     box-shadow: 2px 2px 0px 0px #ffffff;
 }
+
+/* ── Leaflet Map Overrides ──────────────────────────────────── */
+/* Hide the routing machine itinerary panel */
+.leaflet-routing-container {
+    display: none !important;
+}
+
+/* Remove dark theme filter for Leaflet tiles, we will use native dark tiles */
+.leaflet-tile-pane {
+    /* filter removed */
+}
+
+/* Fix marker icons */
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+    /* Keep inverted to make markers orange instead of blue (fits brutalist theme) */
+    filter: invert(1) hue-rotate(180deg);
+}
+
+/* Style Leaflet controls */
+.leaflet-control-zoom a {
+    background: #141313 !important;
+    color: #ffffff !important;
+    border: 2px solid #ffffff !important;
+    border-radius: 0 !important;
+}
+.leaflet-control-attribution {
+    background: rgba(20, 19, 19, 0.8) !important;
+    color: #c4c7c8 !important;
+    font-size: 10px !important;
+}
