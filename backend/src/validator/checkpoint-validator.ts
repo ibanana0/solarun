@@ -34,8 +34,6 @@ export interface ValidationResult {
 
 const DUPLICATE_TAP_THRESHOLD_SECONDS = 30;
 const CHECKPOINT_START = 0;
-const CHECKPOINT_INTERMEDIATE = 1;
-const CHECKPOINT_FINISH = 2;
 
 // ============================================================================
 // Validator
@@ -58,9 +56,9 @@ export async function validateCheckpoint(msg: CheckpointMessage): Promise<Valida
         return { valid: false, error: 'Missing or empty rfid_uid' };
     }
 
-    if (checkpoint_id < CHECKPOINT_START || checkpoint_id > CHECKPOINT_FINISH) {
+    if (checkpoint_id < CHECKPOINT_START) {
         console.log(`[Validator] Validation failed: Invalid checkpoint_id: ${checkpoint_id}`);
-        return { valid: false, error: `Invalid checkpoint_id: ${checkpoint_id}. Must be 0, 1, or 2` };
+        return { valid: false, error: `Invalid checkpoint_id: ${checkpoint_id}. Cannot be negative.` };
     }
 
     if (!timestamp) {
@@ -94,10 +92,10 @@ export async function validateCheckpoint(msg: CheckpointMessage): Promise<Valida
         return { valid: false, error: `Runner not found for chip_uid: ${rfid_uid}` };
     }
 
-    // --- Check Event Cut-off Logic ---
+    // --- Check Event Cut-off Logic & Checkpoints ---
     const { data: event, error: eventError } = await supabase
         .from('race_events')
-        .select('status, end_time')
+        .select('status, end_time, checkpoints_config')
         .eq('id', runner.event_id)
         .maybeSingle();
 
@@ -116,6 +114,19 @@ export async function validateCheckpoint(msg: CheckpointMessage): Promise<Valida
             return { valid: false, error: "Race duration has ended" };
         }
     }
+
+    // Determine max checkpoint
+    let maxCheckpoint = 2; // Default fallback
+    if (event.checkpoints_config && Array.isArray(event.checkpoints_config)) {
+        maxCheckpoint = Math.max(0, event.checkpoints_config.length - 1);
+    }
+    
+    if (checkpoint_id > maxCheckpoint) {
+        console.log(`[Validator] Validation failed: Invalid checkpoint_id: ${checkpoint_id} (Max is ${maxCheckpoint})`);
+        return { valid: false, error: `Invalid checkpoint_id: ${checkpoint_id}. Max is ${maxCheckpoint}.` };
+    }
+    
+    const isFinishCheckpoint = checkpoint_id === maxCheckpoint;
 
     // --- Check runner is not already finished or disqualified ---
     if (runner.status === 'finished') {
@@ -139,7 +150,7 @@ export async function validateCheckpoint(msg: CheckpointMessage): Promise<Valida
     }
 
     // --- All validations passed — record the checkpoint ---
-    const recordResult = await recordCheckpoint(runner.id, runner.event_id, rfid_uid, checkpoint_id, timestamp);
+    const recordResult = await recordCheckpoint(runner.id, runner.event_id, rfid_uid, checkpoint_id, timestamp, isFinishCheckpoint);
     return recordResult;
 }
 
@@ -220,6 +231,7 @@ async function recordCheckpoint(
     chipUid: string,
     checkpointId: number,
     timestamp: string,
+    isFinish: boolean
 ): Promise<ValidationResult> {
     // 1. Insert race log
     const { error: logError } = await supabase
@@ -237,7 +249,6 @@ async function recordCheckpoint(
 
     // 2. Update runner status based on checkpoint
     const isStart = checkpointId === CHECKPOINT_START;
-    const isFinish = checkpointId === CHECKPOINT_FINISH;
 
     if (isStart) {
         // Mark runner as "running"

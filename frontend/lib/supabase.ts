@@ -22,6 +22,7 @@ export interface RaceEvent {
     id: string;
     name: string;
     description: string;
+    location_name?: string | null;
     status: 'pending' | 'active' | 'completed' | 'settled' | 'Initialized' | 'Active' | 'Completed' | 'Settled';
     start_time: string;
     end_time?: string;
@@ -31,6 +32,8 @@ export interface RaceEvent {
     vault_address: string | null;
     creator_wallet: string | null;
     tx_signature?: string | null;
+    start_tx_signature?: string | null;
+    finalize_tx_signature?: string | null;
     checkpoints_config?: CheckpointConfig[] | null;
     route_coordinates?: RouteCoordinate[] | null;
     route_distance_meters?: number | null;
@@ -46,6 +49,7 @@ export interface Runner {
     status: 'registered' | 'running' | 'finished' | 'disqualified';
     finish_position: number | null;
     tx_signature?: string | null;
+    prize_tx_signature?: string | null;
     created_at: string;
     updated_at: string;
 }

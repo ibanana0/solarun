@@ -37,56 +37,54 @@ export function Providers({ children }: { children: React.ReactNode }) {
     const devnetRpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
 
     return (
-        <div>
-            <PrivyProvider
-                appId={privyAppId}
-                config={{
-                    appearance: {
-                        theme: 'light',
-                        accentColor: '#18181b',
-                        walletChainType: 'solana-only',
+        <PrivyProvider
+            appId={privyAppId}
+            config={{
+                appearance: {
+                    theme: 'light',
+                    accentColor: '#18181b',
+                    walletChainType: 'solana-only',
+                },
+                solana: {
+                    rpcs: {
+                        // Official CAIP-2 ID for Mainnet (pointing to Devnet for local development to avoid 403)
+                        'solana:4uhcV1ymUcaLWU2hH9vB68R6F4U4LzSu': {
+                            rpc: createSolanaRpc(devnetRpcUrl),
+                            rpcSubscriptions: createSolanaRpcSubscriptions(devnetRpcUrl.replace('https', 'wss')),
+                        },
+                        // Fallback alias for Mainnet
+                        'solana:mainnet': {
+                            rpc: createSolanaRpc(devnetRpcUrl),
+                            rpcSubscriptions: createSolanaRpcSubscriptions(devnetRpcUrl.replace('https', 'wss')),
+                        },
+                        // Official CAIP-2 ID for Devnet
+                        'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp': {
+                            rpc: createSolanaRpc(devnetRpcUrl),
+                            rpcSubscriptions: createSolanaRpcSubscriptions(devnetRpcUrl.replace('https', 'wss')),
+                        },
+                        // Fallback alias for Devnet
+                        'solana:devnet': {
+                            rpc: createSolanaRpc(devnetRpcUrl),
+                            rpcSubscriptions: createSolanaRpcSubscriptions(devnetRpcUrl.replace('https', 'wss')),
+                        },
                     },
+                },
+                embeddedWallets: {
                     solana: {
-                        rpcs: {
-                            // Official CAIP-2 ID for Mainnet (pointing to Devnet for local development to avoid 403)
-                            'solana:4uhcV1ymUcaLWU2hH9vB68R6F4U4LzSu': {
-                                rpc: createSolanaRpc(devnetRpcUrl),
-                                rpcSubscriptions: createSolanaRpcSubscriptions(devnetRpcUrl.replace('https', 'wss')),
-                            },
-                            // Fallback alias for Mainnet
-                            'solana:mainnet': {
-                                rpc: createSolanaRpc(devnetRpcUrl),
-                                rpcSubscriptions: createSolanaRpcSubscriptions(devnetRpcUrl.replace('https', 'wss')),
-                            },
-                            // Official CAIP-2 ID for Devnet
-                            'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp': {
-                                rpc: createSolanaRpc(devnetRpcUrl),
-                                rpcSubscriptions: createSolanaRpcSubscriptions(devnetRpcUrl.replace('https', 'wss')),
-                            },
-                            // Fallback alias for Devnet
-                            'solana:devnet': {
-                                rpc: createSolanaRpc(devnetRpcUrl),
-                                rpcSubscriptions: createSolanaRpcSubscriptions(devnetRpcUrl.replace('https', 'wss')),
-                            },
-                        },
+                        createOnLogin: 'all-users',
                     },
-                    embeddedWallets: {
-                        solana: {
-                            createOnLogin: 'all-users',
-                        },
+                },
+                externalWallets: {
+                    solana: {
+                        connectors: solanaConnectors,
                     },
-                    externalWallets: {
-                        solana: {
-                            connectors: solanaConnectors,
-                        },
-                    },
-                    loginMethods: ['email', 'google', 'wallet'],
-                }}
-            >
-                <QueryClientProvider client={queryClient}>
-                    {children}
-                </QueryClientProvider>
-            </PrivyProvider>
-        </div>
+                },
+                loginMethods: ['email', 'google', 'wallet'],
+            }}
+        >
+            <QueryClientProvider client={queryClient}>
+                {children}
+            </QueryClientProvider>
+        </PrivyProvider>
     );
 }

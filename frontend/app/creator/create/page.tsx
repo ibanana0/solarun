@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Loader2, LogIn, ShieldAlert, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { Loader2, LogIn, ShieldAlert, CheckCircle2, AlertCircle, Info, ExternalLink, ChevronRight, Terminal } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,7 @@ export default function CreateEventPage() {
 
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
+    const [locationName, setLocationName] = useState('');
     const [feeUsdc, setFeeUsdc] = useState('10');
     const [maxParticipants, setMaxParticipants] = useState('100');
     const [startDate, setStartDate] = useState('');
@@ -149,6 +150,7 @@ export default function CreateEventPage() {
                     id: rawUuid,
                     name: name.trim(),
                     description: description.trim() || null,
+                    location_name: locationName.trim() || null,
                     registration_fee_sol: fee,
                     max_participants: max,
                     status: 'pending',
@@ -227,7 +229,7 @@ export default function CreateEventPage() {
             <div className="bg-background text-on-background min-h-screen flex flex-col">
                 <main className="flex-grow px-margin py-xl max-w-7xl mx-auto w-full flex flex-col items-center justify-center gap-xl">
                     <div className="border-2 border-primary p-xl text-center space-y-lg max-w-xl w-full">
-                        <span className="material-symbols-outlined text-[64px] text-primary block" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                        <CheckCircle2 className="h-16 w-16 text-primary mx-auto" />
                         <h1 className="font-headline-lg text-headline-lg uppercase">EVENT_DEPLOYED</h1>
                         <p className="font-body-sm text-body-sm text-on-surface-variant uppercase">
                             {createdEvent.name} has been successfully initialized on-chain.
@@ -242,7 +244,7 @@ export default function CreateEventPage() {
                                 rel="noreferrer"
                                 className="inline-flex items-center gap-xs font-label-caps text-[10px] text-blue-400 hover:text-blue-300 border border-blue-800 px-sm py-xs transition-none"
                             >
-                                <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                                <ExternalLink className="h-3.5 w-3.5" />
                                 VERIFY ON BLOCKSCAN
                             </a>
                         )}
@@ -275,7 +277,7 @@ export default function CreateEventPage() {
                 <div className="mb-xl">
                     <nav className="flex items-center gap-sm font-label-caps text-label-caps text-on-surface-variant mb-md">
                         <Link href="/creator" className="hover:text-primary transition-none">DASHBOARD</Link>
-                        <span className="material-symbols-outlined text-[12px]">chevron_right</span>
+                        <ChevronRight className="h-3 w-3" />
                         <span className="text-primary">CREATE_EVENT</span>
                     </nav>
                     <h1 className="font-display-xl text-display-xl uppercase leading-[0.8] mb-md">
@@ -312,6 +314,19 @@ export default function CreateEventPage() {
                                         type="text"
                                         value={name}
                                         onChange={(e) => { setName(e.target.value); setError(null); }}
+                                        disabled={submitting}
+                                    />
+                                </div>
+
+                                {/* Event Location */}
+                                <div className="flex flex-col gap-sm">
+                                    <label className="font-label-caps text-label-caps">LOCATION_NAME</label>
+                                    <input
+                                        className="w-full border-2 border-primary bg-transparent p-md font-body-lg text-primary focus:border-primary focus:outline-none"
+                                        placeholder="E.G. MONAS, JAKARTA"
+                                        type="text"
+                                        value={locationName}
+                                        onChange={(e) => { setLocationName(e.target.value); setError(null); }}
                                         disabled={submitting}
                                     />
                                 </div>
@@ -412,6 +427,20 @@ export default function CreateEventPage() {
                                         setCheckpointsConfig(checkpoints);
                                         setRouteCoordinates(route);
                                         setRouteDistanceMeters(distance);
+                                        
+                                        // Auto-fill location if not set yet and we have a START checkpoint
+                                        if (checkpoints.length > 0 && !locationName) {
+                                            const start = checkpoints[0];
+                                            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${start.lat}&lon=${start.lng}`)
+                                                .then(res => res.json())
+                                                .then(data => {
+                                                    const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county || '';
+                                                    const country = data.address?.country || '';
+                                                    if (city) {
+                                                        setLocationName(`${city}${country ? `, ${country}` : ''}`.toUpperCase());
+                                                    }
+                                                }).catch(() => { /* ignore fetch errors */ });
+                                        }
                                     }}
                                     disabled={submitting}
                                 />
@@ -438,7 +467,7 @@ export default function CreateEventPage() {
                             {submitting ? (
                                 <Loader2 className="h-12 w-12 animate-spin" />
                             ) : (
-                                <span className="material-symbols-outlined text-[64px]">terminal</span>
+                                <Terminal className="h-16 w-16" />
                             )}
                         </button>
                         <p className="font-label-caps text-label-caps text-center mt-md text-on-surface-variant">

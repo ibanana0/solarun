@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEvents } from '@/hooks/useEvent';
-import { Loader2, Trophy } from 'lucide-react';
+import { Loader2, Trophy, Lock, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { RaceEvent } from '@/lib/supabase';
 import { useState, useEffect } from 'react';
@@ -92,55 +92,35 @@ function RaceCard({ event }: { event: RaceEvent }) {
             </div>
 
             {/* Data row: start time | participants */}
-            {!settled ? (
-                <div className="grid grid-cols-2 gap-gutter">
-                    <div>
-                        <div className="font-label-caps text-label-caps text-on-surface-variant">START_TIME</div>
-                        <div className="font-body-lg text-body-lg font-bold">{timeDisplay}</div>
-                    </div>
-                    <div className="text-right">
-                        <div className="font-label-caps text-label-caps text-on-surface-variant">CAPACITY</div>
-                        <div className="font-body-lg text-body-lg font-bold">{event.max_participants} RUNNERS</div>
-                    </div>
+            <div className={`grid grid-cols-2 gap-gutter ${settled ? 'opacity-50' : ''}`}>
+                <div>
+                    <div className="font-label-caps text-label-caps text-on-surface-variant">START_TIME</div>
+                    <div className="font-body-lg text-body-lg font-bold">{timeDisplay}</div>
                 </div>
-            ) : (
-                <div className="flex flex-col items-center justify-center py-xl">
-                    <span
-                        className="material-symbols-outlined text-headline-lg"
-                        style={{ fontVariationSettings: "'FILL' 0" }}
-                    >
-                        lock
-                    </span>
-                    <div className="font-label-caps text-label-caps mt-md">EVENT SETTLED</div>
+                <div className="text-right">
+                    <div className="font-label-caps text-label-caps text-on-surface-variant">CAPACITY</div>
+                    <div className="font-body-lg text-body-lg font-bold">{event.max_participants} RUNNERS</div>
                 </div>
-            )}
+            </div>
 
             {/* Entry fee indicator */}
-            {!settled && (
-                <div className="flex justify-between items-center border-t border-surface-container-highest pt-sm">
-                    <span className="font-label-caps text-label-caps text-on-surface-variant">ENTRY_FEE</span>
-                    <span className="font-data-lg text-data-lg">{event.registration_fee_sol} USDC</span>
-                </div>
-            )}
+            <div className={`flex justify-between items-center border-t border-surface-container-highest pt-sm ${settled ? 'opacity-30' : ''}`}>
+                <span className="font-label-caps text-label-caps text-on-surface-variant">ENTRY_FEE</span>
+                <span className="font-data-lg text-data-lg">{event.registration_fee_sol} USDC</span>
+            </div>
 
             {/* CTA button */}
-            {settled ? (
-                <button
-                    className="w-full border-2 border-outline py-md font-label-caps text-label-caps text-outline cursor-not-allowed"
-                    disabled
-                >
-                    EVENT SETTLED
-                </button>
-            ) : (
-                <Button
-                    asChild
-                    className="w-full border-2 border-primary py-md font-label-caps text-label-caps hover:bg-primary hover:text-on-primary transition-none active:translate-y-1 h-auto rounded-none bg-transparent text-primary"
-                >
-                    <Link href={`/event/${event.id}`}>
-                        {completed ? 'VIEW RESULTS' : 'ENTER RACE'}
-                    </Link>
-                </Button>
-            )}
+            <Button
+                asChild
+                className={`w-full border-2 py-md font-label-caps text-label-caps transition-none active:translate-y-1 h-auto rounded-none bg-transparent 
+                    ${settled 
+                        ? 'border-outline text-on-surface-variant hover:bg-surface-container hover:text-primary' 
+                        : 'border-primary text-primary hover:bg-primary hover:text-on-primary'}`}
+            >
+                <Link href={`/event/${event.id}`}>
+                    {settled ? 'VIEW ARCHIVE' : completed ? 'VIEW RESULTS' : (event.status === 'active' || event.status === 'Active') ? 'WATCH LIVE' : 'ENTER RACE'}
+                </Link>
+            </Button>
         </div>
     );
 }
@@ -227,12 +207,7 @@ function FilterSidebar({
 
             {/* Info block */}
             <div className="border-2 border-primary p-lg bg-surface-container-low">
-                <span
-                    className="material-symbols-outlined mb-sm"
-                    style={{ fontVariationSettings: "'FILL' 0" }}
-                >
-                    terminal
-                </span>
+                <Terminal className="h-6 w-6 mb-sm" />
                 <p className="font-body-sm text-body-sm leading-tight text-on-surface-variant">
                     ALL RACE DATA IS VALIDATED VIA SOLANA SMART CONTRACTS AND RFID CHECKPOINT TELEMETRY.
                 </p>
@@ -253,7 +228,7 @@ export default function EventsPage() {
         const now = new Date();
         setSyncTime(
             now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
-            + ' UTC'
+            + ' WIB'
         );
     }, [events]);
 

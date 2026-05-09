@@ -22,11 +22,11 @@ async function testValidatorFlow() {
     // --- Get active event and runners ---
     const { data: runners, error } = await supabase
         .from('runners')
-        .select('chip_uid, full_name, status')
+        .select('chip_uid, full_name, status, event_id')
         .order('chip_uid');
 
-    if (error || !runners) {
-        console.error('❌ Failed to fetch runners:', error?.message);
+    if (error || !runners || runners.length === 0) {
+        console.error('❌ Failed to fetch runners:', error?.message || 'No runners found.');
         return;
     }
 
@@ -41,6 +41,20 @@ async function testValidatorFlow() {
 
     // We'll test with the first 3 runners
     const testRunners = runners.slice(0, 3);
+
+    // Determine max checkpoints from the event of the first runner
+    const { data: eventData } = await supabase
+        .from('race_events')
+        .select('checkpoints_config')
+        .eq('id', testRunners[0]!.event_id)
+        .single();
+    
+    let maxCheckpoint = 2; // Default fallback
+    if (eventData?.checkpoints_config && Array.isArray(eventData.checkpoints_config)) {
+        maxCheckpoint = Math.max(0, eventData.checkpoints_config.length - 1);
+    }
+    
+    console.log(`🏁 Event has ${maxCheckpoint + 1} checkpoints configured. Finish line is CP ${maxCheckpoint}.\n`);
 
     // =========================================================================
     // TEST 1: Valid start checkpoint (checkpoint_id = 0)
@@ -60,19 +74,21 @@ async function testValidatorFlow() {
     }
 
     // =========================================================================
-    // TEST 2: Invalid — skip checkpoint (try checkpoint 2 after 0)
+    // TEST 2: Invalid — skip checkpoint (try finish directly after start)
     // =========================================================================
-    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('  TEST 2: Skip Checkpoint (0 → 2, should FAIL)');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    if (maxCheckpoint > 1) {
+        console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log(`  TEST 2: Skip Checkpoint (0 → ${maxCheckpoint}, should FAIL)`);
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-    const skipMsg: CheckpointMessage = {
-        rfid_uid: testRunners[0]!.chip_uid,
-        checkpoint_id: 2, // skipping checkpoint 1
-        timestamp: new Date().toISOString(),
-    };
-    const skipResult = await validateCheckpoint(skipMsg);
-    console.log(`   ${testRunners[0]!.chip_uid}: ${skipResult.valid ? '❌ UNEXPECTED PASS' : `✅ Correctly rejected — ${skipResult.error}`}`);
+        const skipMsg: CheckpointMessage = {
+            rfid_uid: testRunners[0]!.chip_uid,
+            checkpoint_id: maxCheckpoint, // skipping intermediate
+            timestamp: new Date().toISOString(),
+        };
+        const skipResult = await validateCheckpoint(skipMsg);
+        console.log(`   ${testRunners[0]!.chip_uid}: ${skipResult.valid ? '❌ UNEXPECTED PASS' : `✅ Correctly rejected — ${skipResult.error}`}`);
+    }
 
     // =========================================================================
     // TEST 3: Duplicate tap (same checkpoint within 30s)
@@ -90,34 +106,36 @@ async function testValidatorFlow() {
     console.log(`   ${testRunners[0]!.chip_uid}: ${dupResult.valid ? '❌ UNEXPECTED PASS' : `✅ Correctly rejected — ${dupResult.error}`}`);
 
     // =========================================================================
-    // TEST 4: Valid intermediate checkpoint (checkpoint_id = 1)
+    // TEST 4: Valid intermediate checkpoints (1 to maxCheckpoint - 1)
     // =========================================================================
-    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('  TEST 4: Intermediate Checkpoint (checkpoint_id = 1)');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    for (let cp = 1; cp < maxCheckpoint; cp++) {
+        console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log(`  TEST 4.${cp}: Intermediate Checkpoint (checkpoint_id = ${cp})`);
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-    for (const runner of testRunners) {
-        const msg: CheckpointMessage = {
-            rfid_uid: runner.chip_uid,
-            checkpoint_id: 1,
-            timestamp: new Date().toISOString(),
-        };
-        const result = await validateCheckpoint(msg);
-        console.log(`   ${runner.chip_uid}: ${result.valid ? '✅ PASS' : `❌ FAIL — ${result.error}`}`);
+        for (const runner of testRunners) {
+            const msg: CheckpointMessage = {
+                rfid_uid: runner.chip_uid,
+                checkpoint_id: cp,
+                timestamp: new Date().toISOString(),
+            };
+            const result = await validateCheckpoint(msg);
+            console.log(`   ${runner.chip_uid}: ${result.valid ? '✅ PASS' : `❌ FAIL — ${result.error}`}`);
+        }
     }
 
     // =========================================================================
-    // TEST 5: Finish checkpoint (checkpoint_id = 2) — with staggered arrival
+    // TEST 5: Finish checkpoint
     // =========================================================================
     console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('  TEST 5: Finish Checkpoint (checkpoint_id = 2)');
+    console.log(`  TEST 5: Finish Checkpoint (checkpoint_id = ${maxCheckpoint})`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
     for (let i = 0; i < testRunners.length; i++) {
         const runner = testRunners[i]!;
         const msg: CheckpointMessage = {
             rfid_uid: runner.chip_uid,
-            checkpoint_id: 2,
+            checkpoint_id: maxCheckpoint,
             timestamp: new Date().toISOString(),
         };
         const result = await validateCheckpoint(msg);
@@ -134,7 +152,7 @@ async function testValidatorFlow() {
 
     const alreadyFinished: CheckpointMessage = {
         rfid_uid: testRunners[0]!.chip_uid,
-        checkpoint_id: 2,
+        checkpoint_id: maxCheckpoint,
         timestamp: new Date().toISOString(),
     };
     const finishedResult = await validateCheckpoint(alreadyFinished);

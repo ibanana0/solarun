@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { MapPinPlus, CheckCircle } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -217,12 +218,7 @@ export default function AdminMapBuilder({ onRouteChange, disabled }: AdminMapBui
         {waypoints.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/40 pointer-events-none">
             <div className="border-2 border-primary bg-background px-lg py-md text-center">
-              <span
-                className="material-symbols-outlined text-[48px] block mb-sm text-on-surface-variant"
-                style={{ fontVariationSettings: "'FILL' 0" }}
-              >
-                add_location_alt
-              </span>
+              <MapPinPlus className="h-12 w-12 block mx-auto mb-sm text-on-surface-variant" />
               <p className="font-label-caps text-label-caps text-on-surface-variant">CLICK TO ADD CHECKPOINTS</p>
               <p className="font-body-sm text-body-sm text-on-surface-variant mt-xs opacity-60">START → CHECKPOINT → FINISH</p>
             </div>
@@ -246,7 +242,7 @@ export default function AdminMapBuilder({ onRouteChange, disabled }: AdminMapBui
                   <span className="text-primary font-bold mr-2">{wp.label}</span>
                   {wp.lat.toFixed(5)}° , {wp.lng.toFixed(5)}°
                 </span>
-                <span className="material-symbols-outlined text-primary text-sm">verified</span>
+                <CheckCircle className="h-3.5 w-3.5 text-primary" />
               </div>
             );
           })}

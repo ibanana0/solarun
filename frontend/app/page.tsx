@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEvents } from '@/hooks/useEvent';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { Trophy, Loader2 } from 'lucide-react';
+import { Trophy, Loader2, Activity, Lock, Wallet } from 'lucide-react';
 import type { RaceEvent } from '@/lib/supabase';
 
 function formatDate(dateStr: string) {
@@ -103,12 +103,7 @@ export default function HomePage() {
                     {/* Col 1 – Precision Telemetry */}
                     <div className="p-xl border-b-2 md:border-b-0 md:border-r-2 border-primary hover:bg-surface-container transition-none group">
                         <div className="mb-lg">
-                            <span
-                                className="material-symbols-outlined text-primary text-[48px]"
-                                style={{ fontVariationSettings: "'FILL' 0" }}
-                            >
-                                query_stats
-                            </span>
+                            <Activity className="text-primary h-12 w-12" />
                         </div>
                         <h3 className="font-headline-md text-headline-md text-primary mb-md uppercase">PRECISION TELEMETRY</h3>
                         <p className="font-body-sm text-body-sm text-on-surface-variant">
@@ -119,12 +114,7 @@ export default function HomePage() {
                     {/* Col 2 – Automated Vaults */}
                     <div className="p-xl border-b-2 md:border-b-0 md:border-r-2 border-primary hover:bg-surface-container transition-none group">
                         <div className="mb-lg">
-                            <span
-                                className="material-symbols-outlined text-primary text-[48px]"
-                                style={{ fontVariationSettings: "'FILL' 0" }}
-                            >
-                                lock_open
-                            </span>
+                            <Lock className="text-primary h-12 w-12" />
                         </div>
                         <h3 className="font-headline-md text-headline-md text-primary mb-md uppercase">AUTOMATED VAULTS</h3>
                         <p className="font-body-sm text-body-sm text-on-surface-variant">
@@ -135,12 +125,7 @@ export default function HomePage() {
                     {/* Col 3 – Trustless Payouts */}
                     <div className="p-xl hover:bg-surface-container transition-none group">
                         <div className="mb-lg">
-                            <span
-                                className="material-symbols-outlined text-primary text-[48px]"
-                                style={{ fontVariationSettings: "'FILL' 0" }}
-                            >
-                                account_balance_wallet
-                            </span>
+                            <Wallet className="text-primary h-12 w-12" />
                         </div>
                         <h3 className="font-headline-md text-headline-md text-primary mb-md uppercase">TRUSTLESS PAYOUTS</h3>
                         <p className="font-body-sm text-body-sm text-on-surface-variant">

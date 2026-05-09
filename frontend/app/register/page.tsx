@@ -125,7 +125,7 @@ function RegisterPageContent() {
     };
 
     const availableChips = DEMO_CHIP_UIDS.filter((uid) => !usedChips.includes(uid));
-    const activeEvents = events?.filter((e) => e.status === 'active' || e.status === 'pending') ?? [];
+    const activeEvents = events?.filter((e) => e.status === 'pending') ?? [];
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

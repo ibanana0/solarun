@@ -2,7 +2,7 @@
 
 import { use, useState } from 'react';
 import Link from 'next/link';
-import { Loader2, PlayCircle, CheckCircle2, Copy, Check, AlertCircle, Info } from 'lucide-react';
+import { Loader2, PlayCircle, CheckCircle2, Copy, Check, AlertCircle, Info, ChevronRight, Calendar, MapPin, Map, ExternalLink } from 'lucide-react';
 import { useEvent } from '@/hooks/useEvent';
 import { useRunners } from '@/hooks/useRunners';
 import { useAuth } from '@/hooks/useAuth';
@@ -39,7 +39,7 @@ function formatDateShort(dateStr: string) {
     return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }).toUpperCase()
         + ' // '
         + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
-        + ' UTC';
+        + ' WIB';
 }
 
 function getStatusLabel(status: string): string {
@@ -103,7 +103,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                         .accounts({ admin: program.provider.publicKey, event: eventPda } as any)
                         .rpc();
                     console.log("Race started on-chain:", txSignature);
-                    await supabase.from('race_events').update({ status: 'active' }).eq('id', event.id);
+                    await supabase.from('race_events').update({ status: 'active', start_tx_signature: txSignature }).eq('id', event.id);
                     showDialog("Berhasil!", `Race berhasil dimulai!\n\nTX: ${txSignature}`, "success");
                     refetchEvent();
                 } catch (error: any) {
@@ -154,7 +154,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                         .accounts({ admin: program.provider.publicKey, event: eventPda } as any)
                         .rpc();
                     console.log("Race completed on-chain:", txSignature);
-                    await supabase.from('race_events').update({ status: 'completed' }).eq('id', event.id);
+                    await supabase.from('race_events').update({ status: 'completed', finalize_tx_signature: txSignature }).eq('id', event.id);
                     await supabase.from('runners').update({ status: 'disqualified' }).eq('event_id', event.id).neq('status', 'finished');
                     showDialog("Berhasil!", `Event berhasil difinalisasi!\nPeserta yang belum finish telah dinyatakan DNF.\nSistem akan mulai membagikan hadiah.\n\nTX: ${txSignature}`, "success");
                     refetchEvent();
@@ -215,7 +215,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
         );
     }
 
-    const isEventOpen = event.status === 'active' || event.status === 'pending';
+    const isEventOpen = event.status === 'pending';
     const statusLabel = getStatusLabel(event.status);
     const live = isLive(event.status);
 
@@ -228,7 +228,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                     <div>
                         <nav className="flex items-center gap-sm font-label-caps text-label-caps text-on-surface-variant mb-xs">
                             <Link href="/" className="hover:text-primary transition-none">RACES</Link>
-                            <span className="material-symbols-outlined text-[12px]">chevron_right</span>
+                            <ChevronRight className="h-3 w-3" />
                             <span className="text-primary">{event.name.toUpperCase()}</span>
                         </nav>
                         <div className="flex items-center gap-gutter flex-wrap">
@@ -250,20 +250,67 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                                 <span className="font-label-caps text-[10px]">{isCopied ? 'COPIED' : 'COPY_ID'}</span>
                             </button>
                         </div>
-                        <p className="font-label-caps text-label-caps text-on-surface-variant mt-sm">
-                            {formatDateShort(event.start_time)}
-                        </p>
-                        {event.tx_signature && (
+                        <div className="flex items-center gap-sm mt-sm">
+                            <p className="font-label-caps text-label-caps text-on-surface-variant flex items-center gap-1">
+                                <Calendar className="h-3.5 w-3.5" />
+                                {formatDateShort(event.start_time)}
+                            </p>
+                            {event.location_name && (
+                                <>
+                                    <span className="text-on-surface-variant/30">|</span>
+                                    <p className="font-label-caps text-label-caps text-on-surface-variant flex items-center gap-1">
+                                        <MapPin className="h-3.5 w-3.5" />
+                                        {event.location_name}
+                                    </p>
+                                </>
+                            )}
+                        </div>
+                        {event.checkpoints_config && event.checkpoints_config.length > 0 && (
                             <a
-                                href={`https://explorer.solana.com/tx/${event.tx_signature}?cluster=devnet`}
+                                href={`https://www.google.com/maps/search/?api=1&query=${event.checkpoints_config[0].lat},${event.checkpoints_config[0].lng}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-xs mt-sm font-label-caps text-[10px] text-blue-400 hover:text-blue-300 border border-blue-800 px-sm py-xs transition-none"
+                                className="inline-flex items-center gap-xs font-label-caps text-[10px] text-green-400 hover:text-green-300 border border-green-800 px-sm py-xs transition-none mt-sm"
                             >
-                                <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-                                VERIFY ON BLOCKSCAN
+                                <Map className="h-3.5 w-3.5" />
+                                VIEW ON GOOGLE MAPS
                             </a>
                         )}
+                        <div className="mt-sm flex gap-sm flex-wrap">
+                            {event.tx_signature && (
+                                <a
+                                    href={`https://explorer.solana.com/tx/${event.tx_signature}?cluster=devnet`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-xs font-label-caps text-[10px] text-blue-400 hover:text-blue-300 border border-blue-800 px-sm py-xs transition-none"
+                                >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                    INIT TX
+                                </a>
+                            )}
+                            {event.start_tx_signature && (
+                                <a
+                                    href={`https://explorer.solana.com/tx/${event.start_tx_signature}?cluster=devnet`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-xs font-label-caps text-[10px] text-orange-400 hover:text-orange-300 border border-orange-800 px-sm py-xs transition-none"
+                                >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                    START TX
+                                </a>
+                            )}
+                            {event.finalize_tx_signature && (
+                                <a
+                                    href={`https://explorer.solana.com/tx/${event.finalize_tx_signature}?cluster=devnet`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-xs font-label-caps text-[10px] text-purple-400 hover:text-purple-300 border border-purple-800 px-sm py-xs transition-none"
+                                >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                    FINALIZE TX
+                                </a>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -321,6 +368,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                             <RouteViewer
                                 checkpoints={event?.checkpoints_config || []}
                                 routeCoordinates={event?.route_coordinates || []}
+                                runners={runners ?? []}
                             />
                         </div>
                     </div>

@@ -7,6 +7,7 @@ import { supabase, type Runner } from '@/lib/supabase';
 export type RunnerWithLogs = Runner & {
     last_checkpoint_id: number;
     last_checkpoint_time: string | null;
+    race_logs: { checkpoint_id: number; timestamp: string }[];
 };
 
 export function useRunners(eventId: string) {
@@ -36,13 +37,14 @@ export function useRunners(eventId: string) {
                     lastTime = sortedLogs[0].timestamp;
                 }
 
-                // Clean up the object (remove raw race_logs)
-                const { race_logs, ...rest } = runner;
+                // Clean up the object (keep race_logs for history popup)
+                const { ...rest } = runner;
                 
                 return {
                     ...rest,
                     last_checkpoint_id: lastCp,
                     last_checkpoint_time: lastTime,
+                    race_logs: runner.race_logs || [],
                 } as RunnerWithLogs;
             });
 

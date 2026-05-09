@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useBalance } from '@/hooks/useBalance';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Lock, Cpu, CircuitBoard, LogOut, History, ArrowRight, Activity, Shield } from 'lucide-react';
 import Link from 'next/link';
 
 export default function ProfilePage() {
@@ -18,7 +19,7 @@ export default function ProfilePage() {
     if (ready && !authenticated) {
         return (
             <div className="bg-background text-on-background min-h-screen flex flex-col items-center justify-center px-margin">
-                <span className="material-symbols-outlined text-[64px] mb-lg opacity-30" style={{ fontVariationSettings: "'FILL' 0" }}>lock</span>
+                <Lock className="h-16 w-16 mb-lg opacity-30" />
                 <h1 className="font-headline-md text-headline-md mb-md uppercase">WALLET NOT CONNECTED</h1>
                 <p className="font-body-sm text-body-sm text-on-surface-variant mb-xl text-center max-w-md">
                     Connect your wallet to view your athlete profile, race history, and pending rewards.
@@ -64,14 +65,14 @@ export default function ProfilePage() {
                             </div>
                             <div className="space-y-md">
                                 <div className="flex items-center gap-md p-md border border-outline-variant">
-                                    <span className="material-symbols-outlined text-primary">nfc</span>
+                                    <Cpu className="h-5 w-5 text-primary" />
                                     <div>
                                         <p className="font-label-caps text-label-caps">RFID_SENSOR_01</p>
                                         <p className="text-[10px] text-on-surface-variant">PENDING CONFIGURATION</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-md p-md border border-outline-variant">
-                                    <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>developer_board</span>
+                                    <CircuitBoard className="h-5 w-5 text-primary" />
                                     <div>
                                         <p className="font-label-caps text-label-caps">ESP32_CHECKPOINT</p>
                                         <p className="text-[10px] text-on-surface-variant">AWAITING MQTT SYNC</p>
@@ -97,7 +98,7 @@ export default function ProfilePage() {
                             onClick={logout}
                             className="w-full border-2 border-primary py-md font-label-caps text-label-caps hover:bg-primary hover:text-on-primary transition-none flex items-center justify-center gap-sm"
                         >
-                            <span className="material-symbols-outlined text-inherit">logout</span>
+                            <LogOut className="h-4 w-4 text-inherit" />
                             DISCONNECT WALLET
                         </button>
                     </div>
@@ -125,7 +126,7 @@ export default function ProfilePage() {
                                         <tr className="border-b border-outline-variant">
                                             <td colSpan={5} className="py-xl text-center">
                                                 <div className="flex flex-col items-center gap-md opacity-40">
-                                                    <span className="material-symbols-outlined text-[48px]" style={{ fontVariationSettings: "'FILL' 0" }}>history</span>
+                                                    <History className="h-12 w-12" />
                                                     <p className="font-label-caps text-label-caps">NO RACE HISTORY YET</p>
                                                     <p className="font-body-sm text-body-sm text-on-surface-variant">
                                                         Race data will appear here once you participate in events.
@@ -144,7 +145,7 @@ export default function ProfilePage() {
                                 >
                                     <Link href="/events">
                                         BROWSE AVAILABLE RACES
-                                        <span className="material-symbols-outlined text-sm ml-xs">arrow_forward</span>
+                                        <ArrowRight className="h-4 w-4 ml-xs" />
                                     </Link>
                                 </Button>
                             </div>
@@ -166,8 +167,8 @@ export default function ProfilePage() {
                     </div>
                 </div>
                 <div className="flex gap-md">
-                    <span className="material-symbols-outlined text-primary">monitoring</span>
-                    <span className="material-symbols-outlined text-primary">security</span>
+                    <Activity className="h-5 w-5 text-primary" />
+                    <Shield className="h-5 w-5 text-primary" />
                 </div>
             </footer>
         </div>
