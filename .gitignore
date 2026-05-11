@@ -7,4 +7,4 @@ ARCHITECTURE.md
 .gemini/
 BUG_REPORT_DELETE_EVENT.md
 admin-keypair.json
-docs/
+docs/.worktrees/
