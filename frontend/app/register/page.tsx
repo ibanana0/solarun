@@ -266,6 +266,7 @@ function RegisterPageContent() {
       const userAta = await getAssociatedTokenAddress(mockUsdcMint, runner);
 
       // 2. Execute On-Chain Transaction
+      // Note: Anchor auto-converts snake_case to camelCase in TypeScript
       const txSignature = await program.methods
         .registerParticipant(
           blockchainEventId,

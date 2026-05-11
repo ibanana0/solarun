@@ -273,7 +273,7 @@ export async function buildProcessRefundsInstructions(
 
     // 6. Gunakan MethodsBuilder dengan 6 argumen sesuai IDL yang sudah diupdate
     const mainInstruction = await (program.methods as any)
-      .processRefunds(
+      .process_refunds(
         cleanEventId,
         [], // finishers: Vec<FinisherData>
         nonFinishers, // non_finishers: Vec<string>
@@ -593,7 +593,7 @@ export async function recordFinishOnChain(
 
   // Build the transaction instruction manually for retry control
   const instruction = await (program.methods as any)
-    .recordFinish(
+    .record_finish(
       cleanEventId,
       chipUid,
       checkpointId,
@@ -830,7 +830,7 @@ export async function initializeEventOnChain(
   console.log(`   Vault PDA: ${vaultPda.toBase58()}`);
 
   const tx = await (program.methods as any)
-    .initializeEvent(
+    .initialize_event(
       cleanEventId,
       new anchor.BN(maxParticipants),
       registrationFee,

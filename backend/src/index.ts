@@ -1,18 +1,26 @@
 /**
  * SolaRun Backend — Main Entry Point
- * 
+ *
  * Starts:
  * 1. Express API server
  * 2. MQTT checkpoint listener
  */
-import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
-import { startMqttListener } from './mqtt/listener';
-import { startRefundScheduler, stopRefundScheduler, manualTriggerRefunds } from './scheduler/refund-scheduler';
-import { initBlockchainClient, logBlockchainStatus } from './blockchain/transaction-signer';
-import { deleteEventWithRefund } from './api/deleteEvent';
-import stakingRoutes from './api/routes';
+import "dotenv/config";
+import express from "express";
+import cors from "cors";
+import { startMqttListener } from "./mqtt/listener";
+import {
+  startRefundScheduler,
+  stopRefundScheduler,
+  manualTriggerRefunds,
+} from "./scheduler/refund-scheduler";
+import { startAutoCancelScheduler } from "./services/auto-cancel-scheduler";
+import {
+  initBlockchainClient,
+  logBlockchainStatus,
+} from "./blockchain/transaction-signer";
+import { deleteEventWithRefund } from "./api/deleteEvent";
+import stakingRoutes from "./api/routes";
 
 const PORT = process.env.PORT || 3001;
 
@@ -21,18 +29,18 @@ app.use(cors());
 app.use(express.json());
 
 // Mount staking & fee distribution routes
-app.use('/api', stakingRoutes);
+app.use("/api", stakingRoutes);
 
 // ============================================================================
 // Health check endpoint
 // ============================================================================
 
-app.get('/health', (_req, res) => {
-    res.json({
-        status: 'ok',
-        service: 'solarun-backend',
-        timestamp: new Date().toISOString(),
-    });
+app.get("/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    service: "solarun-backend",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // ============================================================================
@@ -43,40 +51,40 @@ app.get('/health', (_req, res) => {
  * Manually trigger refund processing (for testing/debugging)
  * POST /admin/trigger-refunds
  */
-app.post('/admin/trigger-refunds', async (_req, res) => {
-    try {
-        console.log(`\n📌 Admin endpoint: manual refund trigger`);
-        await manualTriggerRefunds();
-        res.json({
-            status: 'ok',
-            message: 'Refund processing triggered',
-            timestamp: new Date().toISOString(),
-        });
-    } catch (error) {
-        res.status(500).json({
-            status: 'error',
-            message: String(error),
-        });
-    }
+app.post("/admin/trigger-refunds", async (_req, res) => {
+  try {
+    console.log(`\n📌 Admin endpoint: manual refund trigger`);
+    await manualTriggerRefunds();
+    res.json({
+      status: "ok",
+      message: "Refund processing triggered",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: String(error),
+    });
+  }
 });
 
 /**
  * Get blockchain status (for debugging)
  * GET /admin/blockchain-status
  */
-app.get('/admin/blockchain-status', (_req, res) => {
-    try {
-        logBlockchainStatus();
-        res.json({
-            status: 'ok',
-            timestamp: new Date().toISOString(),
-        });
-    } catch (error) {
-        res.status(500).json({
-            status: 'error',
-            message: String(error),
-        });
-    }
+app.get("/admin/blockchain-status", (_req, res) => {
+  try {
+    logBlockchainStatus();
+    res.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: String(error),
+    });
+  }
 });
 
 // ============================================================================
@@ -86,7 +94,7 @@ app.get('/admin/blockchain-status', (_req, res) => {
 /**
  * Delete a race event and refund all participants
  * DELETE /api/events/:id
- * 
+ *
  * Response:
  * {
  *   status: 'ok' | 'error',
@@ -100,28 +108,28 @@ app.get('/admin/blockchain-status', (_req, res) => {
  *   }
  * }
  */
-app.delete('/api/events/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        if (!id) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Event ID is required',
-            });
-        }
+app.delete("/api/events/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
 
-        console.log(`\n📌 Delete event endpoint called: ${id}`);
-        const result = await deleteEventWithRefund(id);
-        
-        const statusCode = result.status === 'ok' ? 200 : 400;
-        res.status(statusCode).json(result);
-    } catch (error) {
-        res.status(500).json({
-            status: 'error',
-            message: String(error),
-        });
+    if (!id) {
+      return res.status(400).json({
+        status: "error",
+        message: "Event ID is required",
+      });
     }
+
+    console.log(`\n📌 Delete event endpoint called: ${id}`);
+    const result = await deleteEventWithRefund(id);
+
+    const statusCode = result.status === "ok" ? 200 : 400;
+    res.status(statusCode).json(result);
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: String(error),
+    });
+  }
 });
 
 // ============================================================================
@@ -129,47 +137,87 @@ app.delete('/api/events/:id', async (req, res) => {
 // ============================================================================
 
 app.listen(PORT, async () => {
-    console.log(`\n🚀 SolaRun Backend running on port ${PORT}`);
-    console.log(`   Health: http://localhost:${PORT}/health`);
-    console.log(`   Delete Event: DELETE http://localhost:${PORT}/api/events/:id`);
-    console.log(`   Blockchain Status: http://localhost:${PORT}/admin/blockchain-status`);
-    console.log(`   Trigger Refunds: POST http://localhost:${PORT}/admin/trigger-refunds`);
-    console.log(``);
-    console.log(`   📦 Staking & Fee Routes:`);
-    console.log(`   Create Event:       POST http://localhost:${PORT}/api/events/create`);
-    console.log(`   Confirm Stake:      POST http://localhost:${PORT}/api/events/:id/confirm-stake`);
-    console.log(`   Event Details:      GET  http://localhost:${PORT}/api/events/:id/details`);
-    console.log(`   Complete Event:     POST http://localhost:${PORT}/api/events/complete`);
-    console.log(`   Event Failure:      POST http://localhost:${PORT}/api/events/failure`);
-    console.log(`   Pending Distrib.:   GET  http://localhost:${PORT}/api/events/pending-distributions`);
-    console.log(`   Confirm Distrib.:   POST http://localhost:${PORT}/api/events/:id/confirm-distribution`);
-    console.log(`   Protocol Config:    GET  http://localhost:${PORT}/api/protocol/config`);
-    console.log('');
+  console.log(`\n🚀 SolaRun Backend running on port ${PORT}`);
+  console.log(`   Health: http://localhost:${PORT}/health`);
+  console.log(
+    `   Delete Event: DELETE http://localhost:${PORT}/api/events/:id`,
+  );
+  console.log(
+    `   Blockchain Status: http://localhost:${PORT}/admin/blockchain-status`,
+  );
+  console.log(
+    `   Trigger Refunds: POST http://localhost:${PORT}/admin/trigger-refunds`,
+  );
+  console.log(``);
+  console.log(`   📦 Staking & Fee Routes:`);
+  console.log(
+    `   Create Event:       POST http://localhost:${PORT}/api/events/create`,
+  );
+  console.log(
+    `   Deposit Status:     GET  http://localhost:${PORT}/api/events/:id/deposit-status`,
+  );
+  console.log(
+    `   Validate Start:     POST http://localhost:${PORT}/api/events/:id/validate-start`,
+  );
+  console.log(
+    `   Trigger AutoCancel: POST http://localhost:${PORT}/api/admin/trigger-auto-cancel`,
+  );
+  console.log(
+    `   Confirm Stake:      POST http://localhost:${PORT}/api/events/:id/confirm-stake`,
+  );
+  console.log(
+    `   Event Details:      GET  http://localhost:${PORT}/api/events/:id/details`,
+  );
+  console.log(
+    `   Complete Event:     POST http://localhost:${PORT}/api/events/complete`,
+  );
+  console.log(
+    `   Event Failure:      POST http://localhost:${PORT}/api/events/failure`,
+  );
+  console.log(
+    `   Pending Distrib.:   GET  http://localhost:${PORT}/api/events/pending-distributions`,
+  );
+  console.log(
+    `   Confirm Distrib.:   POST http://localhost:${PORT}/api/events/:id/confirm-distribution`,
+  );
+  console.log(
+    `   Protocol Config:    GET  http://localhost:${PORT}/api/protocol/config`,
+  );
+  console.log("");
 
-    // Initialize blockchain client
-    try {
-        initBlockchainClient();
-    } catch (error) {
-        console.warn(`⚠️  Warning: Blockchain client initialization failed:`, error);
-        console.log(`   (This is OK for local testing without .env config)`);
-    }
+  // Initialize blockchain client
+  try {
+    initBlockchainClient();
+  } catch (error) {
+    console.warn(
+      `⚠️  Warning: Blockchain client initialization failed:`,
+      error,
+    );
+    console.log(`   (This is OK for local testing without .env config)`);
+  }
 
-    // Start MQTT listener
-    startMqttListener();
+  // Start MQTT listener
+  startMqttListener();
 
-    // Start refund scheduler
-    startRefundScheduler();
+  // Start refund scheduler
+  startRefundScheduler();
 
-    // Graceful shutdown
-    process.on('SIGTERM', () => {
-        console.log(`\n👋 SIGTERM received, shutting down...`);
-        stopRefundScheduler();
-        process.exit(0);
-    });
+  // Start auto-cancel scheduler (deposit deadline checker)
+  if (process.env.NODE_ENV !== "test") {
+    startAutoCancelScheduler("*/5 * * * *"); // Every 5 minutes
+    console.log("✅ Auto-cancel scheduler started (checks every 5 minutes)");
+  }
 
-    process.on('SIGINT', () => {
-        console.log(`\n👋 SIGINT received, shutting down...`);
-        stopRefundScheduler();
-        process.exit(0);
-    });
+  // Graceful shutdown
+  process.on("SIGTERM", () => {
+    console.log(`\n👋 SIGTERM received, shutting down...`);
+    stopRefundScheduler();
+    process.exit(0);
+  });
+
+  process.on("SIGINT", () => {
+    console.log(`\n👋 SIGINT received, shutting down...`);
+    stopRefundScheduler();
+    process.exit(0);
+  });
 });
