@@ -1,17 +1,18 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Program, Idl } from '@coral-xyz/anchor';
+import { Program } from '@coral-xyz/anchor';
 import { useAnchorProvider } from './useAnchorProvider';
-import IDL from '@/lib/solarun_temp.json';
-import { SolarunTemp } from '@/lib/solarun_temp';
+// Explicitly import the IDL that was just synced
+import IDL from '../lib/solarun_idl.json';
 
-export function useProgram(): Program<SolarunTemp> | null {
+export function useProgram(): Program | null {
     const provider = useAnchorProvider();
 
     const program = useMemo(() => {
         if (!provider) return null;
-        return new Program<SolarunTemp>(IDL as any, provider);
+        // Use IDL as any to bypass static type generation which might be stale
+        return new Program(IDL as any, provider);
     }, [provider]);
 
     return program;

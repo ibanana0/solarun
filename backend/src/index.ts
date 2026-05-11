@@ -12,12 +12,16 @@ import { startMqttListener } from './mqtt/listener';
 import { startRefundScheduler, stopRefundScheduler, manualTriggerRefunds } from './scheduler/refund-scheduler';
 import { initBlockchainClient, logBlockchainStatus } from './blockchain/transaction-signer';
 import { deleteEventWithRefund } from './api/deleteEvent';
+import stakingRoutes from './api/routes';
 
 const PORT = process.env.PORT || 3001;
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Mount staking & fee distribution routes
+app.use('/api', stakingRoutes);
 
 // ============================================================================
 // Health check endpoint
@@ -130,6 +134,16 @@ app.listen(PORT, async () => {
     console.log(`   Delete Event: DELETE http://localhost:${PORT}/api/events/:id`);
     console.log(`   Blockchain Status: http://localhost:${PORT}/admin/blockchain-status`);
     console.log(`   Trigger Refunds: POST http://localhost:${PORT}/admin/trigger-refunds`);
+    console.log(``);
+    console.log(`   📦 Staking & Fee Routes:`);
+    console.log(`   Create Event:       POST http://localhost:${PORT}/api/events/create`);
+    console.log(`   Confirm Stake:      POST http://localhost:${PORT}/api/events/:id/confirm-stake`);
+    console.log(`   Event Details:      GET  http://localhost:${PORT}/api/events/:id/details`);
+    console.log(`   Complete Event:     POST http://localhost:${PORT}/api/events/complete`);
+    console.log(`   Event Failure:      POST http://localhost:${PORT}/api/events/failure`);
+    console.log(`   Pending Distrib.:   GET  http://localhost:${PORT}/api/events/pending-distributions`);
+    console.log(`   Confirm Distrib.:   POST http://localhost:${PORT}/api/events/:id/confirm-distribution`);
+    console.log(`   Protocol Config:    GET  http://localhost:${PORT}/api/protocol/config`);
     console.log('');
 
     // Initialize blockchain client

@@ -1,6 +1,17 @@
 use anchor_lang::prelude::*;
 
 // ============================================================================
+// GLOBAL STATE ACCOUNT (Protocol Configuration)
+// ============================================================================
+
+#[account]
+pub struct GlobalState {
+    pub treasury_address: Pubkey,   // Wallet address to receive protocol fees
+    pub protocol_fee_bps: u16,      // Protocol fee in basis points (e.g., 500 = 5%)
+    pub bump: u8,                   // PDA bump seed
+}
+
+// ============================================================================
 // EVENT ACCOUNT
 // ============================================================================
 
@@ -8,17 +19,37 @@ use anchor_lang::prelude::*;
 pub struct Event {
     pub event_id: String,           // UUID, max 36 chars
     pub vault: Pubkey,              // PDA vault token account address
+    pub stake_vault: Pubkey,        // PDA vault for admin's stake deposit
     pub admin: Pubkey,              // Event creator
     pub mint: Pubkey,               // Mock USDC mint address
     pub status: EventStatus,        // Initialized, Active, Completed, Settled
     pub participant_count: u32,     // Total registered
-    pub max_participants: u32,      // NEW: Maximum participants allowed
+    pub max_participants: u32,      // Maximum participants allowed
     pub total_deposits: u64,        // Total USDC in vault (token units)
     pub registration_fee: u64,      // Fee per participant (token units)
+    pub stake_amount: u64,          // Amount staked by admin (token units)
+    pub is_completed: bool,         // Whether completion was processed (prevents double-spending)
     pub start_time: i64,            // Unix timestamp
     pub end_time: i64,              // Unix timestamp
+    pub dispute_lock_until: i64,    // UTC timestamp when stake can be released
+    pub dispute_lock_seconds: i64,  // Duration of dispute lock in seconds
     pub bump: u8,                   // PDA bump seed
     pub vault_bump: u8,             // PDA vault bump seed
+    pub stake_vault_bump: u8,       // Stake vault PDA bump seed
+}
+
+// ============================================================================
+// STAKE VAULT ACCOUNT (Holds admin's stake deposit)
+// ============================================================================
+
+#[account]
+pub struct StakeVault {
+    pub event: Pubkey,              // Reference to associated Event account
+    pub admin: Pubkey,              // Event admin who deposited the stake
+    pub vault: Pubkey,              // PDA token account for this stake
+    pub amount: u64,                // Amount staked (token units)
+    pub is_slashed: bool,           // Whether stake was slashed as penalty
+    pub bump: u8,                   // PDA bump seed
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]

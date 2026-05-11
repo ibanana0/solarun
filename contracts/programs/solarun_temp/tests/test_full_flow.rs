@@ -76,6 +76,7 @@ fn initialize_event(
             registration_fee: 1_000_000,
             start_time: 1700000000,
             end_time: 1700003600,
+            dispute_lock_seconds: 3600,
         }.data(),
         solarun_temp::accounts::InitializeEvent {
             admin: payer.pubkey(),
@@ -225,9 +226,38 @@ fn complete_race(
         solarun_temp::accounts::CompleteRace {
             admin: payer.pubkey(),
             event: event_pda,
+            global_state: Pubkey::default(),
+            vault: Pubkey::default(),
+            treasury_account: Pubkey::default(),
+            token_program: spl_token::id(),
         }.to_account_metas(None),
     );
     send_ix(svm, payer, ix).unwrap();
+}
+
+fn initialize_global_state(
+    svm: &mut LiteSVM,
+    payer: &Keypair,
+    program_id: &Pubkey,
+    treasury_address: Pubkey,
+) -> Pubkey {
+    let (global_state, _) = Pubkey::find_program_address(&[b"global"], program_id);
+
+    let ix = Instruction::new_with_bytes(
+        *program_id,
+        &solarun_temp::instruction::InitializeGlobalState {
+            treasury_address,
+            protocol_fee_bps: 100,
+        }.data(),
+        solarun_temp::accounts::InitializeGlobalState {
+            initializer: payer.pubkey(),
+            global_state,
+            system_program: system_program::id(),
+        }.to_account_metas(None),
+    );
+
+    send_ix(svm, payer, ix).unwrap();
+    global_state
 }
 
 #[test]
@@ -236,6 +266,26 @@ fn test_full_e2e_flow() {
     let event_id = "evt_e2e_1";
 
     let (mock_usdc_mint, mint_authority) = create_mock_mint(&mut svm, &admin, &program_id);
+    
+    // 1. Buat Keypair untuk treasury agar dia bisa menandatangani pembuatan ATA-nya sendiri
+    let treasury_keypair = Keypair::new();
+    let treasury_address = treasury_keypair.pubkey();
+    
+    // 2. Beri saldo SOL ke treasury agar bisa membayar rent (biaya pembuatan ATA)
+    svm.airdrop(&treasury_address, 1_000_000_000).unwrap();
+
+    let global_state = initialize_global_state(&mut svm, &admin, &program_id, treasury_address);
+    
+    // 3. Gunakan helper mint_usdc_to untuk membuat ATA treasury (dan mint 0 token)
+    let treasury_account = mint_usdc_to(
+        &mut svm, 
+        &treasury_keypair, // Signer adalah treasury itu sendiri
+        &program_id, 
+        mock_usdc_mint, 
+        mint_authority, 
+        0
+    );
+
     let (event_pda, vault_pda) = initialize_event(&mut svm, &admin, &program_id, event_id, mock_usdc_mint);
 
     // Create 3 runners
@@ -291,7 +341,21 @@ fn test_full_e2e_flow() {
     record_finish(&mut svm, &admin, &program_id, event_id, event_pda, &runners[0].1, 1);
     record_finish(&mut svm, &admin, &program_id, event_id, event_pda, &runners[1].1, 2);
 
-    complete_race(&mut svm, &admin, &program_id, event_id, event_pda);
+    let ix_complete = Instruction::new_with_bytes(
+        program_id,
+        &solarun_temp::instruction::CompleteRace {
+            event_id: event_id.to_string(),
+        }.data(),
+        solarun_temp::accounts::CompleteRace {
+            admin: admin.pubkey(),
+            event: event_pda,
+            global_state,
+            vault: vault_pda,
+            treasury_account,
+            token_program: spl_token::id(),
+        }.to_account_metas(None),
+    );
+    send_ix(&mut svm, &admin, ix_complete).expect("Complete race failed");
 
     // Process refunds
     let mut metas = solarun_temp::accounts::ProcessRefunds {

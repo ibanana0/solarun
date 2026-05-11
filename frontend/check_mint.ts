@@ -1,6 +1,6 @@
 import { PublicKey, Connection } from '@solana/web3.js';
 
-const PROGRAM_ID = new PublicKey('9E1BTHP1EP9UQbbXJKZ8Laj7PxXw1vhxJTeFpEEjfYZn');
+const PROGRAM_ID = new PublicKey('E8KF9A7PiYbi3UmZTDy4RFnJYsvjmo3oQ7NwTuGzR2C8');
 
 const [mockUsdcMint] = PublicKey.findProgramAddressSync(
     [Buffer.from('mock_usdc_mint')],

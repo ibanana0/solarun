@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/solarun_temp.json`.
  */
 export type SolarunTemp = {
-  "address": "9E1BTHP1EP9UQbbXJKZ8Laj7PxXw1vhxJTeFpEEjfYZn",
+  "address": "E8KF9A7PiYbi3UmZTDy4RFnJYsvjmo3oQ7NwTuGzR2C8",
   "metadata": {
     "name": "solarunTemp",
     "version": "0.1.0",

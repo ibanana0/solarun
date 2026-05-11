@@ -37,6 +37,12 @@ export interface RaceEvent {
     checkpoints_config?: CheckpointConfig[] | null;
     route_coordinates?: RouteCoordinate[] | null;
     route_distance_meters?: number | null;
+    // Staking & Protocol Fee fields (Phase 2.6)
+    stake_amount?: number;
+    stake_status?: 'pending' | 'staked' | 'returned' | 'slashed';
+    protocol_fee_bps?: number;
+    is_completed?: boolean;
+    treasury_fee_collected?: number;
     created_at: string;
 }
 

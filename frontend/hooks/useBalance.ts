@@ -6,7 +6,7 @@ import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 import { useAuth } from './useAuth';
 
 const RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
-const PROGRAM_ID = new PublicKey('9E1BTHP1EP9UQbbXJKZ8Laj7PxXw1vhxJTeFpEEjfYZn');
+const PROGRAM_ID = new PublicKey('E8KF9A7PiYbi3UmZTDy4RFnJYsvjmo3oQ7NwTuGzR2C8');
 
 export function useBalance() {
     const { walletAddress, authenticated } = useAuth();

@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Plus, Trophy, Eye, ArrowLeft, Loader2, LogIn, ShieldAlert, Trash, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { Plus, Trophy, Eye, ArrowLeft, Loader2, LogIn, ShieldAlert, Trash, CheckCircle2, AlertCircle, Info, DollarSign } from 'lucide-react';
 import { useCreatorEvents } from '@/hooks/useEvent';
 import { useAuth } from '@/hooks/useAuth';
 import { StatusBadge } from '@/components/StatusBadge';
+import EarningsBreakdownCard from '@/components/EarningsBreakdownCard';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -196,29 +197,7 @@ export default function CreatorDashboard() {
         );
     }
 
-    // ── Not a creator ──
-    if (!isCreator) {
-        return (
-            <div className="container max-w-md py-12">
-                <Card>
-                    <CardContent className="pt-6 text-center space-y-4">
-                        <ShieldAlert className="h-12 w-12 mx-auto opacity-40 text-orange-500" />
-                        <CardTitle>Akses Ditolak</CardTitle>
-                        <CardDescription>
-                            Halaman ini hanya bisa diakses oleh pengguna dengan role <strong>Creator</strong>.
-                            Akun kamu saat ini terdaftar sebagai <strong>Runner</strong>.
-                        </CardDescription>
-                        <p className="text-xs text-muted-foreground">
-                            Hubungi admin untuk mengubah role kamu menjadi Creator.
-                        </p>
-                        <Button variant="outline" asChild>
-                            <Link href="/">Kembali ke Home</Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
+
 
     // ── Creator Dashboard ──
     return (
@@ -334,6 +313,37 @@ export default function CreatorDashboard() {
                     </div>
                 )}
             </div>
+
+            {/* Earnings Breakdown Section (Phase 2.6) */}
+            {!isLoading && events && events.some(e => (e.status === 'completed' || e.status === 'settled' || e.status === 'active') && (e.stake_amount ?? 0) > 0) && (
+                <>
+                    <Separator />
+                    <div className="space-y-4">
+                        <h2 className="text-lg font-semibold flex items-center gap-2">
+                            <DollarSign className="h-5 w-5" /> Earnings Breakdown
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {events
+                                .filter(e => (e.stake_amount ?? 0) > 0)
+                                .map(event => (
+                                    <EarningsBreakdownCard
+                                        key={`earnings-${event.id}`}
+                                        eventId={event.id}
+                                        eventName={event.name}
+                                        status={event.status as 'pending' | 'active' | 'completed' | 'settled'}
+                                        registrationFeePerPerson={event.registration_fee_sol}
+                                        stakeAmount={event.stake_amount ?? 0}
+                                        participantCount={event.max_participants}
+                                        protocolFeeBps={event.protocol_fee_bps ?? 500}
+                                        isCompleted={event.is_completed ?? false}
+                                        stakeStatus={event.stake_status ?? 'pending'}
+                                        treasuryFeeCollected={event.treasury_fee_collected ?? 0}
+                                    />
+                                ))}
+                        </div>
+                    </div>
+                </>
+            )}
 
             <AlertDialog open={dialog.open} onOpenChange={(open) => setDialog(prev => ({ ...prev, open }))}>
                 <AlertDialogContent>

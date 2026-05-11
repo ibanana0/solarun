@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Loader2, LogIn, ShieldAlert, CheckCircle2, AlertCircle, Info, ExternalLink, ChevronRight, Terminal } from 'lucide-react';
+import { Loader2, LogIn, ShieldAlert, CheckCircle2, AlertCircle, Info, ExternalLink, ChevronRight, Terminal, Coins } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -18,11 +18,13 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { useProgram } from '@/hooks/useProgram';
+import { useStakingAndFees } from '@/hooks/useStakingAndFees';
 import * as anchor from '@coral-xyz/anchor';
 import { PublicKey } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
 import { v4 as uuidv4 } from 'uuid';
 import dynamic from 'next/dynamic';
+import StakingInfoCard from '@/components/StakingInfoCard';
 
 const AdminMapBuilder = dynamic(() => import('@/components/AdminMapBuilder'), {
     ssr: false,
@@ -36,6 +38,7 @@ const AdminMapBuilder = dynamic(() => import('@/components/AdminMapBuilder'), {
 export default function CreateEventPage() {
     const { ready, authenticated, login, isCreator, walletAddress, loading: authLoading } = useAuth();
     const program = useProgram();
+    const { executeStakeEvent, stakingLoading, stakingError } = useStakingAndFees(program);
 
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -45,6 +48,9 @@ export default function CreateEventPage() {
     const [startDate, setStartDate] = useState('');
     const [startTime, setStartTime] = useState('');
     const [durationHours, setDurationHours] = useState('2');
+    const [disputeLockHours, setDisputeLockHours] = useState('24');
+    const [stakeAmountUsdc, setStakeAmountUsdc] = useState('5');
+    const PROTOCOL_FEE_BPS = 500; // 5% protocol fee
 
     // Route config – auto-updated from AdminMapBuilder
     const [checkpointsConfig, setCheckpointsConfig] = useState<any[]>([]);
@@ -53,7 +59,9 @@ export default function CreateEventPage() {
 
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [createdEvent, setCreatedEvent] = useState<{ id: string; name: string; tx_signature?: string } | null>(null);
+    const [createdEvent, setCreatedEvent] = useState<{ id: string; name: string; tx_signature?: string; rawUuid?: string; eventId?: string; vaultPda?: string } | null>(null);
+    const [stakingStep, setStakingStep] = useState(false);
+    const [stakeCompleted, setStakeCompleted] = useState(false);
 
     // Dialog state
     const [dialog, setDialog] = useState<{
@@ -90,6 +98,28 @@ export default function CreateEventPage() {
         const duration = parseFloat(durationHours);
         if (isNaN(duration) || duration <= 0) { setError('EVENT_DURATION must be greater than 0.'); return; }
 
+        const lockHours = parseFloat(disputeLockHours);
+        if (isNaN(lockHours) || lockHours < 0) { setError('DISPUTE_LOCK must be 0 or more.'); return; }
+
+        const stakeAmount = parseFloat(stakeAmountUsdc);
+        if (isNaN(stakeAmount)) { setError('STAKE_AMOUNT is invalid.'); return; }
+
+        // NEW: Validate stake amount
+        const expectedMaxPool = fee * max;
+        const minStake = expectedMaxPool * 0.05;
+        const maxStake = expectedMaxPool * 2.0;
+
+        if (stakeAmount > 0) {  // Only validate if stake provided
+            if (stakeAmount < minStake) {
+                setError(`Stake amount must be at least ${minStake.toFixed(6)} USDC (5% of max pool)`);
+                return;
+            }
+            if (stakeAmount > maxStake) {
+                setError(`Stake amount cannot exceed ${maxStake.toFixed(6)} USDC (200% of max pool)`);
+                return;
+            }
+        }
+
         // Build timestamps
         const startDateTime = new Date(`${startDate}T${startTime}`);
         if (isNaN(startDateTime.getTime())) { setError('Invalid date/time format.'); return; }
@@ -106,7 +136,8 @@ export default function CreateEventPage() {
         setSubmitting(true);
         try {
             const programId = program.programId;
-            const admin = program.provider.publicKey;
+            // Robustly get the admin public key from the walletAddress string
+            const admin = new PublicKey(walletAddress);
 
             // Derive PDAs
             const [eventPda] = PublicKey.findProgramAddressSync(
@@ -122,26 +153,38 @@ export default function CreateEventPage() {
                 programId
             );
 
+            console.log("Creating event with:", {
+                eventId,
+                max,
+                fee: fee * 1_000_000,
+                start: Math.floor(startDateTime.getTime() / 1000),
+                end: Math.floor(endDateTime.getTime() / 1000),
+                lock: lockHours * 3600,
+                admin: admin.toBase58()
+            });
+
             // Execute On-Chain Transaction
-            const txSignature = await program.methods
-                .initializeEvent(
-                    eventId,
-                    new anchor.BN(max),
-                    new anchor.BN(fee * 1_000_000),
-                    new anchor.BN(Math.floor(startDateTime.getTime() / 1000)),
-                    new anchor.BN(Math.floor(endDateTime.getTime() / 1000))
-                )
-                .accounts({
-                    admin,
-                    event: eventPda,
-                    vault: vaultPda,
-                    mockUsdcMint,
-                    systemProgram: anchor.web3.SystemProgram.programId,
-                    tokenProgram: TOKEN_PROGRAM_ID,
-                } as any)
-                .rpc();
+            const method = (program.methods as any).initializeEvent(
+                eventId,
+                new anchor.BN(max),
+                new anchor.BN(fee * 1_000_000),
+                new anchor.BN(Math.floor(startDateTime.getTime() / 1000)),
+                new anchor.BN(Math.floor(endDateTime.getTime() / 1000)),
+                new anchor.BN(Math.floor(lockHours * 3600)) // 6th argument: dispute_lock_seconds
+            );
+
+            const txSignature = await method.accounts({
+                admin: admin,
+                event: eventPda,
+                vault: vaultPda,
+                mockUsdcMint,
+                systemProgram: anchor.web3.SystemProgram.programId,
+                tokenProgram: TOKEN_PROGRAM_ID,
+            } as any).rpc();
 
             console.log("On-chain event initialized:", txSignature);
+
+            const stakeAmount = parseFloat(stakeAmountUsdc);
 
             // Sync to Supabase
             const { data, error: insertError } = await supabase
@@ -162,6 +205,11 @@ export default function CreateEventPage() {
                     checkpoints_config: checkpointsConfig.length > 0 ? checkpointsConfig : null,
                     route_coordinates: routeCoordinates.length > 0 ? routeCoordinates : null,
                     route_distance_meters: routeDistanceMeters > 0 ? routeDistanceMeters : null,
+                    stake_amount: stakeAmount > 0 ? stakeAmount : 0,
+                    stake_status: 'pending',
+                    protocol_fee_bps: PROTOCOL_FEE_BPS,
+                    is_completed: false,
+                    treasury_fee_collected: 0,
                 })
                 .select('id, name, tx_signature')
                 .single();
@@ -171,11 +219,31 @@ export default function CreateEventPage() {
                 return;
             }
 
-            setCreatedEvent(data);
-            showDialog("EVENT_DEPLOYED", `Event "${data.name}" has been successfully initialized on-chain.`, "success");
+            setCreatedEvent({ ...data, rawUuid, eventId, vaultPda: vaultPda.toBase58() });
+
+            if (stakeAmount > 0) {
+                setStakingStep(true);
+                showDialog("EVENT_DEPLOYED", `Event "${data.name}" initialized on-chain.\n\nNext step: Deposit your stake of ${stakeAmount} USDC to activate.`, "success");
+            } else {
+                showDialog("EVENT_DEPLOYED", `Event "${data.name}" has been successfully initialized on-chain.`, "success");
+            }
         } catch (err: any) {
             console.error("Failed to create event:", err);
-            showDialog("DEPLOY_FAILED", `Transaction error: ${err.message || 'Unknown error. Retry.'}`, "error");
+            
+            // Extract meaningful error information from the opaque object
+            let errMsg = 'Unknown error';
+            if (err instanceof Error) {
+                errMsg = err.message;
+            } else if (err && typeof err === 'object') {
+                errMsg = JSON.stringify(err, Object.getOwnPropertyNames(err));
+            }
+
+            const friendlyMsg = errMsg.includes('insufficient funds')
+                ? 'Insufficient SOL for gas fees. Please fund your wallet.'
+                : errMsg.includes('User rejected')
+                    ? 'Transaction was rejected by user.'
+                    : `Transaction error: ${errMsg}`;
+            showDialog("DEPLOY_FAILED", friendlyMsg, "error");
         } finally {
             setSubmitting(false);
         }
@@ -207,61 +275,129 @@ export default function CreateEventPage() {
         );
     }
 
-    // ── Not a creator ──
-    if (!isCreator) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 px-margin">
-                <ShieldAlert className="h-16 w-16 opacity-30 text-orange-500" />
-                <p className="font-label-caps text-label-caps uppercase text-on-surface-variant">ACCESS_DENIED // CREATOR_ROLE_REQUIRED</p>
-                <Link
-                    href="/"
-                    className="border-2 border-primary px-xl py-md font-label-caps text-label-caps hover:bg-primary hover:text-background transition-none"
-                >
-                    ← BACK TO RACES
-                </Link>
-            </div>
-        );
-    }
 
-    // ── Success state ──
+
+    // ── Stake Deposit Handler ──
+    const handleStakeDeposit = async () => {
+        if (!createdEvent?.eventId || !createdEvent?.vaultPda || !program || !walletAddress) return;
+        setSubmitting(true);
+        try {
+            const programId = program.programId;
+            const admin = new PublicKey(walletAddress);
+            const [mockUsdcMint] = PublicKey.findProgramAddressSync(
+                [Buffer.from('mock_usdc_mint')],
+                programId
+            );
+            const adminTokenAccount = await getAssociatedTokenAddress(mockUsdcMint, admin);
+            const vaultPubkey = new PublicKey(createdEvent.vaultPda);
+
+            const txSig = await executeStakeEvent(
+                createdEvent.eventId,
+                parseFloat(stakeAmountUsdc),
+                adminTokenAccount,
+                vaultPubkey,
+                mockUsdcMint
+            );
+
+            // Update stake_status in Supabase
+            await supabase
+                .from('race_events')
+                .update({ stake_status: 'staked' })
+                .eq('id', createdEvent.id);
+
+            setStakeCompleted(true);
+            setStakingStep(false);
+            showDialog("STAKE_DEPOSITED", `Stake of ${stakeAmountUsdc} USDC deposited successfully.\n\nTx: ${txSig?.slice(0, 20)}...`, "success");
+        } catch (err: any) {
+            console.error("Stake deposit failed:", err);
+            const errMsg = err?.message || 'Unknown error';
+            const friendlyMsg = errMsg.includes('insufficient')
+                ? 'Insufficient USDC balance. Use the Faucet to mint Mock USDC first.'
+                : errMsg.includes('User rejected')
+                    ? 'Transaction was rejected by user.'
+                    : `Stake deposit error: ${errMsg}`;
+            showDialog("STAKE_FAILED", friendlyMsg, "error");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    // ── Success state (with optional staking step) ──
     if (createdEvent) {
         return (
             <div className="bg-background text-on-background min-h-screen flex flex-col">
                 <main className="flex-grow px-margin py-xl max-w-7xl mx-auto w-full flex flex-col items-center justify-center gap-xl">
                     <div className="border-2 border-primary p-xl text-center space-y-lg max-w-xl w-full">
-                        <CheckCircle2 className="h-16 w-16 text-primary mx-auto" />
-                        <h1 className="font-headline-lg text-headline-lg uppercase">EVENT_DEPLOYED</h1>
-                        <p className="font-body-sm text-body-sm text-on-surface-variant uppercase">
-                            {createdEvent.name} has been successfully initialized on-chain.
-                        </p>
-                        <p className="font-body-sm text-xs text-on-surface-variant font-mono break-all">
-                            ID: {createdEvent.id}
-                        </p>
-                        {createdEvent.tx_signature && (
-                            <a
-                                href={`https://explorer.solana.com/tx/${createdEvent.tx_signature}?cluster=devnet`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-xs font-label-caps text-[10px] text-blue-400 hover:text-blue-300 border border-blue-800 px-sm py-xs transition-none"
-                            >
-                                <ExternalLink className="h-3.5 w-3.5" />
-                                VERIFY ON BLOCKSCAN
-                            </a>
+                        {stakingStep && !stakeCompleted ? (
+                            <>
+                                <Coins className="h-16 w-16 text-orange-500 mx-auto" />
+                                <h1 className="font-headline-lg text-headline-lg uppercase">DEPOSIT_STAKE</h1>
+                                <p className="font-body-sm text-body-sm text-on-surface-variant uppercase">
+                                    Event &quot;{createdEvent.name}&quot; created. Deposit your stake to activate.
+                                </p>
+                                <div className="bg-orange-900/20 border border-orange-700 p-md text-left space-y-xs">
+                                    <p className="font-label-caps text-label-caps text-orange-500">STAKE_AMOUNT</p>
+                                    <p className="font-data-lg text-orange-400">{stakeAmountUsdc} USDC</p>
+                                    <p className="font-body-xs text-on-surface-variant">
+                                        This collateral is locked until event completion.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={handleStakeDeposit}
+                                    disabled={submitting || stakingLoading}
+                                    className="w-full bg-orange-600 text-background py-md font-label-caps text-label-caps hover:bg-orange-500 transition-none uppercase disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-sm"
+                                >
+                                    {submitting || stakingLoading ? (
+                                        <><Loader2 className="h-4 w-4 animate-spin" /> DEPOSITING STAKE...</>
+                                    ) : (
+                                        <><Coins className="h-4 w-4" /> DEPOSIT {stakeAmountUsdc} USDC STAKE</>
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => { setStakingStep(false); }}
+                                    className="w-full border border-primary/40 py-sm font-label-caps text-label-caps text-on-surface-variant hover:border-primary transition-none uppercase text-xs"
+                                >
+                                    SKIP FOR NOW
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <CheckCircle2 className="h-16 w-16 text-primary mx-auto" />
+                                <h1 className="font-headline-lg text-headline-lg uppercase">EVENT_DEPLOYED</h1>
+                                <p className="font-body-sm text-body-sm text-on-surface-variant uppercase">
+                                    {createdEvent.name} has been successfully initialized on-chain.
+                                    {stakeCompleted && ' Stake deposited ✓'}
+                                </p>
+                                <p className="font-body-sm text-xs text-on-surface-variant font-mono break-all">
+                                    ID: {createdEvent.id}
+                                </p>
+                                {createdEvent.tx_signature && (
+                                    <a
+                                        href={`https://explorer.solana.com/tx/${createdEvent.tx_signature}?cluster=devnet`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-xs font-label-caps text-[10px] text-blue-400 hover:text-blue-300 border border-blue-800 px-sm py-xs transition-none"
+                                    >
+                                        <ExternalLink className="h-3.5 w-3.5" />
+                                        VERIFY ON BLOCKSCAN
+                                    </a>
+                                )}
+                                <div className="flex gap-gutter justify-center pt-md">
+                                    <Link
+                                        href={`/event/${createdEvent.id}`}
+                                        className="border-2 border-primary px-lg py-sm font-label-caps text-label-caps hover:bg-primary hover:text-background transition-none"
+                                    >
+                                        VIEW EVENT
+                                    </Link>
+                                    <Link
+                                        href="/creator"
+                                        className="border-2 border-primary/40 px-lg py-sm font-label-caps text-label-caps text-on-surface-variant hover:border-primary transition-none"
+                                    >
+                                        DASHBOARD
+                                    </Link>
+                                </div>
+                            </>
                         )}
-                        <div className="flex gap-gutter justify-center pt-md">
-                            <Link
-                                href={`/event/${createdEvent.id}`}
-                                className="border-2 border-primary px-lg py-sm font-label-caps text-label-caps hover:bg-primary hover:text-background transition-none"
-                            >
-                                VIEW EVENT
-                            </Link>
-                            <Link
-                                href="/creator"
-                                className="border-2 border-primary/40 px-lg py-sm font-label-caps text-label-caps text-on-surface-variant hover:border-primary transition-none"
-                            >
-                                DASHBOARD
-                            </Link>
-                        </div>
                     </div>
                 </main>
             </div>
@@ -344,8 +480,8 @@ export default function CreateEventPage() {
                                     />
                                 </div>
 
-                                {/* Date / Time / Duration */}
-                                <div className="grid grid-cols-3 gap-gutter">
+                                {/* Date / Time / Duration / Lock */}
+                                <div className="grid grid-cols-4 gap-gutter">
                                     <div className="flex flex-col gap-sm">
                                         <label className="font-label-caps text-label-caps">GENESIS_DATE</label>
                                         <input
@@ -368,7 +504,7 @@ export default function CreateEventPage() {
                                         />
                                     </div>
                                     <div className="flex flex-col gap-sm">
-                                        <label className="font-label-caps text-label-caps">EVENT_DURATION</label>
+                                        <label className="font-label-caps text-label-caps">EVENT_DURATION (HRS)</label>
                                         <input
                                             className="w-full border-2 border-primary bg-transparent p-md font-body-sm text-primary focus:outline-none"
                                             type="number"
@@ -377,6 +513,18 @@ export default function CreateEventPage() {
                                             placeholder="2"
                                             value={durationHours}
                                             onChange={(e) => { setDurationHours(e.target.value); setError(null); }}
+                                            disabled={submitting}
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-sm">
+                                        <label className="font-label-caps text-label-caps">DISPUTE_LOCK (HRS)</label>
+                                        <input
+                                            className="w-full border-2 border-primary bg-transparent p-md font-body-sm text-primary focus:outline-none"
+                                            type="number"
+                                            min="0"
+                                            placeholder="24"
+                                            value={disputeLockHours}
+                                            onChange={(e) => { setDisputeLockHours(e.target.value); setError(null); }}
                                             disabled={submitting}
                                         />
                                     </div>
@@ -413,6 +561,27 @@ export default function CreateEventPage() {
                                         />
                                     </div>
                                 </div>
+
+                                {/* Stake Amount (Phase 2.6) */}
+                                <div className="flex flex-col gap-sm">
+                                    <label className="font-label-caps text-label-caps">CREATOR_STAKE_USDC</label>
+                                    <div className="relative">
+                                        <input
+                                            className="w-full border-2 border-orange-600 bg-orange-900/10 p-md font-data-lg text-orange-400 focus:outline-none focus:border-orange-500"
+                                            placeholder="5.00"
+                                            step="0.01"
+                                            min="0"
+                                            type="number"
+                                            value={stakeAmountUsdc}
+                                            onChange={(e) => { setStakeAmountUsdc(e.target.value); setError(null); }}
+                                            disabled={submitting}
+                                        />
+                                        <span className="absolute right-md top-1/2 -translate-y-1/2 font-label-caps text-label-caps text-orange-500 opacity-70">USDC</span>
+                                    </div>
+                                    <p className="font-body-xs text-body-xs text-on-surface-variant">
+                                        Collateral locked until event completion. Set 0 for no stake.
+                                    </p>
+                                </div>
                             </section>
                         </div>
 
@@ -427,7 +596,7 @@ export default function CreateEventPage() {
                                         setCheckpointsConfig(checkpoints);
                                         setRouteCoordinates(route);
                                         setRouteDistanceMeters(distance);
-                                        
+
                                         // Auto-fill location if not set yet and we have a START checkpoint
                                         if (checkpoints.length > 0 && !locationName) {
                                             const start = checkpoints[0];
@@ -445,6 +614,17 @@ export default function CreateEventPage() {
                                     disabled={submitting}
                                 />
                             </section>
+
+                            {/* StakingInfoCard (Phase 2.6) */}
+                            {parseFloat(stakeAmountUsdc) > 0 && (
+                                <StakingInfoCard
+                                    stakeAmount={parseFloat(stakeAmountUsdc) || 0}
+                                    registrationFee={parseFloat(feeUsdc) || 0}
+                                    maxParticipants={parseInt(maxParticipants) || 2}
+                                    protocolFeeBps={PROTOCOL_FEE_BPS}
+                                    estimatedParticipants={Math.min(parseInt(maxParticipants) || 50, 50)}
+                                />
+                            )}
                         </div>
                     </div>
 

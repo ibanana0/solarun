@@ -1,7 +1,7 @@
+use crate::error::ErrorCode;
+use crate::{Event, EventStatus, Participant, ParticipantStatus};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
-use crate::{Event, EventStatus, Participant, ParticipantStatus};
-use crate::error::ErrorCode;
 
 /// Register a participant for an event (pays USDC registration fee)
 #[derive(Accounts)]
@@ -13,7 +13,8 @@ pub struct RegisterParticipant<'info> {
     #[account(
         mut,
         seeds = [b"event", event_id.as_bytes()],
-        bump = event.bump
+        bump = event.bump,
+        constraint = runner.key() != event.admin @ ErrorCode::CreatorCannotRegister,
     )]
     pub event: Account<'info, Event>,
 
@@ -59,8 +60,14 @@ pub fn handler(
         return Err(ErrorCode::EventNotFound.into());
     }
 
-    require!(event.status == EventStatus::Initialized, ErrorCode::EventNotInitialized);
-    require!(event.participant_count < event.max_participants, ErrorCode::MaxParticipantsReached);
+    require!(
+        event.status == EventStatus::Initialized,
+        ErrorCode::EventNotInitialized
+    );
+    require!(
+        event.participant_count < event.max_participants,
+        ErrorCode::MaxParticipantsReached
+    );
 
     if chip_uid.is_empty() || chip_uid.len() > 20 {
         return Err(ErrorCode::InvalidChipUid.into());
@@ -91,7 +98,9 @@ pub fn handler(
     participant.finished_at = None;
     participant.bump = ctx.bumps.participant;
 
-    event.participant_count = event.participant_count.checked_add(1)
+    event.participant_count = event
+        .participant_count
+        .checked_add(1)
         .ok_or(ErrorCode::MaxParticipantsReached)?;
 
     // CPI: Transfer USDC registration fee from runner to vault
@@ -102,13 +111,12 @@ pub fn handler(
             to: ctx.accounts.vault.to_account_info(),
             authority: ctx.accounts.runner.to_account_info(),
         };
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.token_program.key(),
-            cpi_accounts,
-        );
+        let cpi_ctx = CpiContext::new(ctx.accounts.token_program.key(), cpi_accounts);
         token::transfer(cpi_ctx, fee)?;
 
-        event.total_deposits = event.total_deposits.checked_add(fee)
+        event.total_deposits = event
+            .total_deposits
+            .checked_add(fee)
             .ok_or(ErrorCode::ArithmeticOverflow)?;
     }
 
@@ -119,7 +127,11 @@ pub fn handler(
         fee_paid: fee,
     });
 
-    msg!("Participant registered: {} for event: {}", chip_uid, event_id);
+    msg!(
+        "Participant registered: {} for event: {}",
+        chip_uid,
+        event_id
+    );
     Ok(())
 }
 

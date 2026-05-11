@@ -25,10 +25,10 @@ export function Navbar() {
     const ADMIN_WALLET = 'A7PqEe2t83XkEmVT3ToaTr5pubUAKwMGyAZdg69gUsyv';
     const { ready, authenticated, solaRunUser, walletAddress, login, logout, isCreator: authIsCreator } = useAuth();
     const { solBalance, usdcBalance, refresh: refreshBalance, loading: balanceLoading } = useBalance();
-    
+
     // Fallback creator check if Supabase sync is delayed
     const isCreator = authIsCreator || (walletAddress === ADMIN_WALLET);
-    
+
     const program = useProgram();
     const [faucetLoading, setFaucetLoading] = useState(false);
     const [mintExists, setMintExists] = useState<boolean | null>(null);
@@ -82,7 +82,7 @@ export function Navbar() {
 
     const handleInitializeMint = async () => {
         if (!program || !walletAddress) return;
-        
+
         const exists = await checkMint();
         if (exists) {
             showDialog("MINT_EXISTS", "Mock USDC Mint already exists on-chain.", "info");
@@ -134,9 +134,9 @@ export function Navbar() {
         if (mintExists === false) {
             if (isCreator) {
                 showDialog(
-                    "MINT_NOT_READY", 
-                    "Mock USDC Mint not initialized. Initialize now?", 
-                    "warning", 
+                    "MINT_NOT_READY",
+                    "Mock USDC Mint not initialized. Initialize now?",
+                    "warning",
                     () => handleInitializeMint(),
                     "INITIALIZE",
                     "CANCEL"
@@ -157,7 +157,7 @@ export function Navbar() {
             const [mintAuthority] = PublicKey.findProgramAddressSync([Buffer.from('mint_authority')], programId);
             const userAta = await getAssociatedTokenAddress(mockUsdcMint, owner);
             const amount = new anchor.BN(100 * 1_000_000); // 100 USDC
-            
+
             await program.methods
                 .mintMockUsdc(amount)
                 .accounts({
@@ -204,7 +204,7 @@ export function Navbar() {
             <Link href="/" className="font-headline-lg text-[32px] sm:text-[48px] text-primary tracking-tighter uppercase leading-none hover:opacity-80 transition-none">
                 SOLARUN
             </Link>
-            
+
             <nav className="hidden lg:flex items-center gap-8">
                 <Link className="font-label-caps text-[12px] text-on-surface-variant hover:text-primary transition-none uppercase tracking-widest" href="/">RACES</Link>
                 <Link className="font-label-caps text-[12px] text-on-surface-variant hover:text-primary transition-none uppercase tracking-widest" href="/events">EXPLORE</Link>
@@ -237,7 +237,7 @@ export function Navbar() {
                         INITIALIZING...
                     </button>
                 ) : !authenticated ? (
-                    <button 
+                    <button
                         onClick={login}
                         className="font-label-caps text-[12px] border-2 border-primary px-8 py-3 text-primary hover:bg-primary hover:text-background transition-none active:translate-y-1 uppercase tracking-widest"
                     >
@@ -246,7 +246,7 @@ export function Navbar() {
                 ) : (
                     <div className="flex items-center gap-2">
                         {isCreator && mintExists === false && (
-                            <button 
+                            <button
                                 onClick={handleInitializeMint}
                                 disabled={faucetLoading}
                                 className="hidden xl:flex font-label-caps text-[10px] border-2 border-destructive px-4 py-2 text-destructive hover:bg-destructive hover:text-white transition-none uppercase"
@@ -254,15 +254,15 @@ export function Navbar() {
                                 INIT_MINT
                             </button>
                         )}
-                        <button 
-                            onClick={handleFaucet} 
-                            disabled={faucetLoading || (mintExists === false && !isCreator)}
+                        <button
+                            onClick={handleFaucet}
+                            disabled={faucetLoading || (mintExists === false)}
                             className="hidden xl:flex font-label-caps text-[10px] border-2 border-blue-500 px-4 py-2 text-blue-500 hover:bg-blue-500 hover:text-white transition-none uppercase"
                         >
                             {faucetLoading ? 'PROCESSING...' : 'FAUCET_USDC'}
                         </button>
-                        
-                        <button 
+
+                        <button
                             onClick={handleCopyAddress}
                             className="flex items-center gap-2 px-3 py-2 border-2 border-primary/10 hover:border-primary transition-none group"
                             title="Copy Address"
@@ -273,7 +273,7 @@ export function Navbar() {
                             {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 opacity-30 group-hover:opacity-100" />}
                         </button>
 
-                        <button 
+                        <button
                             onClick={logout}
                             className="p-2 border-2 border-transparent hover:border-destructive text-on-surface-variant hover:text-destructive transition-none"
                             title="Logout"
@@ -283,7 +283,7 @@ export function Navbar() {
                     </div>
                 )}
             </div>
-            
+
             <AlertDialog open={dialog.open} onOpenChange={(open) => setDialog(prev => ({ ...prev, open }))}>
                 <AlertDialogContent className="rounded-none border-2 border-primary bg-background font-space-mono">
                     <AlertDialogHeader>
@@ -304,7 +304,7 @@ export function Navbar() {
                                 {dialog.cancelText}
                             </AlertDialogCancel>
                         )}
-                        <AlertDialogAction 
+                        <AlertDialogAction
                             onClick={() => dialog.onConfirm?.()}
                             className="rounded-none bg-primary text-background px-8 py-2 font-label-caps text-[12px] uppercase hover:bg-transparent hover:text-primary border-2 border-primary transition-none"
                         >

@@ -48,6 +48,7 @@ fn test_initialize() {
     let registration_fee = 1_000_000;
     let start_time = 1700000000;
     let end_time = 1700003600;
+    let dispute_lock_seconds = 3600;
 
     let (event_pda, _bump) = Pubkey::find_program_address(
         &[b"event", event_id.as_bytes()],
@@ -66,6 +67,7 @@ fn test_initialize() {
             registration_fee,
             start_time,
             end_time,
+            dispute_lock_seconds,
         }.data(),
         solarun_temp::accounts::InitializeEvent {
             admin: payer.pubkey(),

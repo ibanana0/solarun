@@ -134,16 +134,3 @@ async function simulate() {
 simulate().catch(e => {
     console.error('\n❌ Simulation Failed:', e.message);
 });
-ion');
-
-    console.log(`   Event Status: ${finalEvent?.status}`);
-    finalRunners?.forEach(r => {
-        console.log(`   - ${r.full_name}: ${r.status} #${r.finish_position}`);
-    });
-
-    console.log('\n✨ SIMULATION COMPLETE!');
-}
-
-simulate().catch(e => {
-    console.error('\n❌ Simulation Failed:', e.message);
-});

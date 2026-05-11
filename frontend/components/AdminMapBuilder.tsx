@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { MapPinPlus, CheckCircle } from 'lucide-react';
+import { MapPinPlus, CheckCircle, Loader2 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -123,6 +123,7 @@ export interface AdminMapBuilderProps {
 }
 
 export default function AdminMapBuilder({ onRouteChange, disabled }: AdminMapBuilderProps) {
+  const [isMounted, setIsMounted] = useState(false);
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [routeCoords, setRouteCoords] = useState<Array<{ lat: number; lng: number }>>([]);
   const [distance, setDistance] = useState(0);
@@ -177,6 +178,18 @@ export default function AdminMapBuilder({ onRouteChange, disabled }: AdminMapBui
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [JSON.stringify(waypoints.map((w) => [w.lat, w.lng])), waypoints.map((w) => w.label).join(',')],
   );
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return (
+        <div className="aspect-video bg-surface-container border-2 border-primary flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-on-surface-variant" />
+        </div>
+    );
+  }
 
   const distKm = (distance / 1000).toFixed(2);
 

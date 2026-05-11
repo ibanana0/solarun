@@ -20,6 +20,7 @@ pub struct StartRace<'info> {
 pub fn handler(ctx: Context<StartRace>, _event_id: String) -> Result<()> {
     let event = &mut ctx.accounts.event;
     require!(event.status == EventStatus::Initialized, ErrorCode::EventAlreadyStarted);
+    require!(event.stake_amount > 0, ErrorCode::InsufficientStake);
     event.status = EventStatus::Active;
     
     msg!("Race started: {}", event.event_id);

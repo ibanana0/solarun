@@ -28,6 +28,9 @@ pub enum ErrorCode {
     #[msg("E0013: Wallet address already registered for this event")]
     WalletAlreadyRegistered,
 
+    #[msg("E0015: Event creator cannot register as a participant in their own event")]
+    CreatorCannotRegister,
+
     #[msg("E0014: Invalid chip UID (empty or too long, max 20 chars)")]
     InvalidChipUid,
 
@@ -97,4 +100,47 @@ pub enum ErrorCode {
 
     #[msg("Event must be in Completed status to process refunds")]
     EventNotCompletedForRefund,
+
+    // E0060-E0069: Staking & Protocol Fees
+    #[msg("E0060: Insufficient stake amount")]
+    InsufficientStake,
+
+    #[msg("E0061: Stake already deposited for this event")]
+    StakeAlreadyDeposited,
+
+    #[msg("E0062: Global state account not found")]
+    GlobalStateNotFound,
+
+    #[msg("E0063: Treasury address not set")]
+    TreasuryAddressNotSet,
+
+    #[msg("E0064: Event already completed, cannot process again")]
+    EventAlreadyCompleted,
+
+    #[msg("E0065: Insufficient funds in vault for fee distribution")]
+    InsufficientVaultFunds,
+
+    #[msg("E0066: Stake vault error")]
+    StakeVaultError,
+
+    #[msg("E0067: Cannot refund - event must be in Completed status")]
+    CannotRefundEventNotCompleted,
+
+    #[msg("E0068: Refund already processed")]
+    RefundAlreadyProcessed,
+
+    #[msg("Stake amount is below minimum required")]
+    StakeTooLow,
+    
+    #[msg("Stake amount exceeds maximum allowed")]
+    StakeTooHigh,
+    
+    #[msg("Protocol fee cannot exceed 10000 bps (100%)")]
+    InvalidProtocolFee,
+
+    #[msg("Stake is locked during dispute period")]
+    StakeLocked,
+    
+    #[msg("No stake to release")]
+    NoStakeToRelease,
 }
