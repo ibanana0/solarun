@@ -79,7 +79,7 @@ impl EventStatus {
 pub struct Participant {
     pub runner_id: String,                  // UUID from Supabase, max 36 chars
     pub wallet: Pubkey,                     // Participant's wallet
-    pub chip_uid: String,                   // RFID chip UID, max 20 chars
+    pub rfid_uid: String,                   // RFID chip UID, exactly 4 chars
     pub full_name: String,                  // Name, max 50 chars
     pub finish_position: Option<u8>,        // 1, 2, 3, 4, ... or None
     pub status: ParticipantStatus,          // Registered, Running, Finished, etc

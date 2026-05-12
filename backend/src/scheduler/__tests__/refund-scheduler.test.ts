@@ -74,7 +74,7 @@ describe('Refund Scheduler', () => {
             // Event 1 runners
             {
                 id: 'runner-1',
-                chip_uid: '08:1A:2B:3C',
+                rfid_uid: '08:1A:2B:3C',
                 wallet_address: 'ABC123',
                 full_name: 'Runner One',
                 event_id: 'event-1',
@@ -83,7 +83,7 @@ describe('Refund Scheduler', () => {
             },
             {
                 id: 'runner-2',
-                chip_uid: '0D:2C:3D:4E',
+                rfid_uid: '0D:2C:3D:4E',
                 wallet_address: 'DEF456',
                 full_name: 'Runner Two',
                 event_id: 'event-1',
@@ -92,7 +92,7 @@ describe('Refund Scheduler', () => {
             },
             {
                 id: 'runner-3',
-                chip_uid: 'FF:FF:FF:FF',
+                rfid_uid: 'FF:FF:FF:FF',
                 wallet_address: 'GHI789',
                 full_name: 'Runner Three',
                 event_id: 'event-1',
@@ -101,7 +101,7 @@ describe('Refund Scheduler', () => {
             },
             {
                 id: 'runner-4',
-                chip_uid: '11:11:11:11',
+                rfid_uid: '11:11:11:11',
                 wallet_address: 'JKL012',
                 full_name: 'Runner Four',
                 event_id: 'event-1',
@@ -111,7 +111,7 @@ describe('Refund Scheduler', () => {
             // Event 2 runners
             {
                 id: 'runner-5',
-                chip_uid: '22:22:22:22',
+                rfid_uid: '22:22:22:22',
                 wallet_address: 'MNO345',
                 full_name: 'Runner Five',
                 event_id: 'event-2',
@@ -358,7 +358,7 @@ describe('Refund Scheduler', () => {
             mockSupabase.getMockData('runners').push(
                 {
                     id: 'runner-6',
-                    chip_uid: '33:33:33:33',
+                    rfid_uid: '33:33:33:33',
                     wallet_address: 'PQR678',
                     full_name: 'Runner Six',
                     event_id: 'event-4',
@@ -367,7 +367,7 @@ describe('Refund Scheduler', () => {
                 },
                 {
                     id: 'runner-7',
-                    chip_uid: '44:44:44:44',
+                    rfid_uid: '44:44:44:44',
                     wallet_address: 'STU901',
                     full_name: 'Runner Seven',
                     event_id: 'event-4',
@@ -426,7 +426,7 @@ describe('Refund Scheduler', () => {
             mockSupabase.setMockData('runners', [
                 {
                     id: 'runner-1',
-                    chip_uid: '08:1A:2B:3C',
+                    rfid_uid: '08:1A:2B:3C',
                     wallet_address: 'ABC123',
                     full_name: 'Runner One',
                     event_id: 'event-1',
@@ -435,7 +435,7 @@ describe('Refund Scheduler', () => {
                 },
                 {
                     id: 'runner-2',
-                    chip_uid: '0D:2C:3D:4E',
+                    rfid_uid: '0D:2C:3D:4E',
                     wallet_address: 'DEF456',
                     full_name: 'Runner Two',
                     event_id: 'event-1',

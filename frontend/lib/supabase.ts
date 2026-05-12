@@ -61,7 +61,7 @@ export interface RaceEvent {
 
 export interface Runner {
   id: string;
-  chip_uid: string;
+  rfid_uid: string;
   wallet_address: string;
   full_name: string;
   event_id: string;

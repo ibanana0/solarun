@@ -31,7 +31,7 @@ pub struct ProcessRefunds<'info> {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct FinisherData {
-    pub chip_uid: String,
+    pub rfid_uid: String,
     pub position: u8,
 }
 

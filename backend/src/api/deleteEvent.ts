@@ -68,7 +68,7 @@ export async function deleteEventWithRefund(eventId: string) {
     // ── Step 3: Fetch all registered participants ────────────────────────────
     const { data: participants, error: participantsError } = await supabase
       .from("runners")
-      .select("id, wallet_address, chip_uid")
+      .select("id, wallet_address, rfid_uid")
       .eq("event_id", eventId);
 
     if (participantsError) {

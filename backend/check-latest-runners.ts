@@ -9,7 +9,7 @@ async function run() {
     console.log("LATEST EVENT:", events?.[0]?.name, events?.[0]?.status);
     
     if (events && events.length > 0) {
-        const { data: runners } = await supabase.from('runners').select('chip_uid, status, finish_position, tx_signature').eq('event_id', events[0].id);
+        const { data: runners } = await supabase.from('runners').select('rfid_uid, status, finish_position, tx_signature').eq('event_id', events[0].id);
         console.log("RUNNERS:");
         console.table(runners);
     }

@@ -4,7 +4,7 @@ use crate::error::ErrorCode;
 
 /// Record finish checkpoint for a participant
 #[derive(Accounts)]
-#[instruction(event_id: String, chip_uid: String)]
+#[instruction(event_id: String, rfid_uid: String)]
 pub struct RecordFinish<'info> {
     #[account(
         mut,
@@ -21,7 +21,7 @@ pub struct RecordFinish<'info> {
 
     #[account(
         mut,
-        seeds = [b"participant", event.key().as_ref(), chip_uid.as_bytes()],
+        seeds = [b"participant", event.key().as_ref(), rfid_uid.as_bytes()],
         bump = participant.bump
     )]
     pub participant: Account<'info, Participant>,
@@ -30,7 +30,7 @@ pub struct RecordFinish<'info> {
 pub fn handler(
     ctx: Context<RecordFinish>,
     event_id: String,
-    chip_uid: String,
+    rfid_uid: String,
     checkpoint_id: u8,
     finish_position: u8,
     timestamp: i64,
@@ -50,7 +50,7 @@ pub fn handler(
     }
 
     let participant = &mut ctx.accounts.participant;
-    if participant.chip_uid != chip_uid {
+    if participant.rfid_uid != rfid_uid {
         return Err(ErrorCode::ParticipantNotFound.into());
     }
 
@@ -61,12 +61,12 @@ pub fn handler(
     match checkpoint_id {
         0 => {
             participant.status = ParticipantStatus::Running;
-            msg!("Participant {} started at {}", chip_uid, timestamp);
+            msg!("Participant {} started at {}", rfid_uid, timestamp);
         }
         1 => {
             // Even though status is still "Running", the last_checkpoint will reflect CP1
             participant.status = ParticipantStatus::Running;
-            msg!("Participant {} passed checkpoint 1 at {}", chip_uid, timestamp);
+            msg!("Participant {} passed checkpoint 1 at {}", rfid_uid, timestamp);
         }
         2 => {
             if participant.status == ParticipantStatus::Finished {
@@ -77,7 +77,7 @@ pub fn handler(
             participant.finished_at = Some(timestamp);
             participant.finish_position = Some(finish_position);
 
-            msg!("Participant {} finished at position {} at {}", chip_uid, finish_position, timestamp);
+            msg!("Participant {} finished at position {} at {}", rfid_uid, finish_position, timestamp);
         }
         _ => {
             return Err(ErrorCode::InvalidCheckpointId.into());
@@ -86,7 +86,7 @@ pub fn handler(
 
     emit!(CheckpointRecorded {
         event_id: event_id.clone(),
-        chip_uid: chip_uid.clone(),
+        rfid_uid: rfid_uid.clone(),
         checkpoint_id,
         timestamp,
     });
@@ -97,7 +97,7 @@ pub fn handler(
 #[event]
 pub struct CheckpointRecorded {
     pub event_id: String,
-    pub chip_uid: String,
+    pub rfid_uid: String,
     pub checkpoint_id: u8,
     pub timestamp: i64,
 }

@@ -190,17 +190,17 @@ async function spawnDummies(eventId: string) {
 
   for (let i = 0; i < canSpawn; i++) {
     const idx = alreadyRegistered + i + 1;
-    const chipUid = `dummy-${idx.toString().padStart(3, "0")}`;
+    const rfidUid = `dummy-${idx.toString().padStart(3, "0")}`;
     const name = DUMMY_NAMES[i % DUMMY_NAMES.length]!;
 
     console.log(`─────────────────────────────────────────────────────`);
-    console.log(`[${i + 1}/${canSpawn}] Spawning "${name}" | chip: ${chipUid}`);
+    console.log(`[${i + 1}/${canSpawn}] Spawning "${name}" | chip: ${rfidUid}`);
 
     // Cek duplikat di Supabase
     const { data: existingRunner } = await supabase
       .from("runners")
       .select("id")
-      .eq("chip_uid", chipUid)
+      .eq("rfid_uid", rfidUid)
       .eq("event_id", eventId)
       .maybeSingle();
 
@@ -304,7 +304,7 @@ async function spawnDummies(eventId: string) {
     // ── Registrasi on-chain ────────────────────────────────────────
 
     const [participantPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(chipUid)],
+      [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(rfidUid)],
       PROGRAM_ID,
     );
 
@@ -313,7 +313,7 @@ async function spawnDummies(eventId: string) {
       regTx = await (runnerProgram.methods as any)
         .register_participant(
           cleanEventId,
-          chipUid,
+          rfidUid,
           keypair.publicKey,
           name,
           `dummy_${idx}`,
@@ -345,7 +345,7 @@ async function spawnDummies(eventId: string) {
 
     const { error: dbErr } = await supabase.from("runners").insert({
       event_id: eventId,
-      chip_uid: chipUid,
+      rfid_uid: rfidUid,
       wallet_address: keypair.publicKey.toBase58(),
       full_name: name,
       status: "registered",
@@ -380,7 +380,7 @@ async function spawnDummies(eventId: string) {
   // Tampilkan daftar semua runner setelah spawn
   const { data: allRunners } = await supabase
     .from("runners")
-    .select("chip_uid, full_name, status")
+    .select("rfid_uid, full_name, status")
     .eq("event_id", eventId)
     .order("created_at", { ascending: true });
 
@@ -388,10 +388,10 @@ async function spawnDummies(eventId: string) {
   console.log("─────────────────────────────────────────────────────");
   allRunners?.forEach((r, idx) => {
     const isReal =
-      !r.chip_uid.startsWith("dummy-") && !r.chip_uid.startsWith("CHIP_SIM");
+      !r.rfid_uid.startsWith("dummy-") && !r.rfid_uid.startsWith("CHIP_SIM");
     const badge = isReal ? "🔴 REAL " : "🤖 DUMMY";
     console.log(
-      `   ${String(idx + 1).padStart(2)}. [${badge}] ${r.chip_uid.padEnd(12)} — ${r.full_name} [${r.status}]`,
+      `   ${String(idx + 1).padStart(2)}. [${badge}] ${r.rfid_uid.padEnd(12)} — ${r.full_name} [${r.status}]`,
     );
   });
 

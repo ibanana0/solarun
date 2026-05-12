@@ -131,10 +131,10 @@ fn register_participant(
     event_pda: Pubkey,
     vault_pda: Pubkey,
     mock_usdc_mint: Pubkey,
-    chip_uid: &str,
+    rfid_uid: &str,
 ) {
     let (participant_pda, _) = Pubkey::find_program_address(
-        &[b"participant", event_pda.as_ref(), chip_uid.as_bytes()],
+        &[b"participant", event_pda.as_ref(), rfid_uid.as_bytes()],
         program_id,
     );
     let runner_token_account = get_ata(&runner.pubkey(), &mock_usdc_mint);
@@ -143,10 +143,10 @@ fn register_participant(
         *program_id,
         &solarun_temp::instruction::RegisterParticipant {
             event_id: event_id.to_string(),
-            chip_uid: chip_uid.to_string(),
+            rfid_uid: rfid_uid.to_string(),
             wallet_address: runner.pubkey(),
             full_name: "Test Runner".to_string(),
-            runner_id: format!("run_{}", chip_uid),
+            runner_id: format!("run_{}", rfid_uid),
         }
         .data(),
         solarun_temp::accounts::RegisterParticipant {
@@ -230,11 +230,11 @@ fn record_finish(
     program_id: &Pubkey,
     event_id: &str,
     event_pda: Pubkey,
-    chip_uid: &str,
+    rfid_uid: &str,
     position: u8,
 ) {
     let (participant_pda, _) = Pubkey::find_program_address(
-        &[b"participant", event_pda.as_ref(), chip_uid.as_bytes()],
+        &[b"participant", event_pda.as_ref(), rfid_uid.as_bytes()],
         program_id,
     );
 
@@ -242,7 +242,7 @@ fn record_finish(
         *program_id,
         &solarun_temp::instruction::RecordFinish {
             event_id: event_id.to_string(),
-            chip_uid: chip_uid.to_string(),
+            rfid_uid: rfid_uid.to_string(),
             checkpoint_id: 2, // finish
             finish_position: position,
             timestamp: 1700001000 + (position as i64 * 100),
@@ -350,7 +350,7 @@ fn test_full_e2e_flow() {
             mint_authority,
             5_000_000,
         );
-        let chip_uid = format!("chip_00{}", i);
+        let rfid_uid = format!("chip_00{}", i);
         register_participant(
             &mut svm,
             &runner,
@@ -359,9 +359,9 @@ fn test_full_e2e_flow() {
             event_pda,
             vault_pda,
             mock_usdc_mint,
-            &chip_uid,
+            &rfid_uid,
         );
-        runners.push((runner, chip_uid));
+        runners.push((runner, rfid_uid));
     }
 
     // 5. Start race (requires stake_amount > 0 — guaranteed by step 3)
@@ -378,9 +378,9 @@ fn test_full_e2e_flow() {
         mint_authority,
         5_000_000,
     );
-    let late_chip_uid = "chip_late";
+    let late_rfid_uid = "chip_late";
     let (participant_pda, _) = Pubkey::find_program_address(
-        &[b"participant", event_pda.as_ref(), late_chip_uid.as_bytes()],
+        &[b"participant", event_pda.as_ref(), late_rfid_uid.as_bytes()],
         &program_id,
     );
     let runner_token_account = get_ata(&late_runner.pubkey(), &mock_usdc_mint);
@@ -388,7 +388,7 @@ fn test_full_e2e_flow() {
         program_id,
         &solarun_temp::instruction::RegisterParticipant {
             event_id: event_id.to_string(),
-            chip_uid: late_chip_uid.to_string(),
+            rfid_uid: late_rfid_uid.to_string(),
             wallet_address: late_runner.pubkey(),
             full_name: "Late Runner".to_string(),
             runner_id: "run_late".to_string(),
@@ -469,11 +469,11 @@ fn test_full_e2e_flow() {
 
     let finishers = vec![
         solarun_temp::instructions::process_refunds::FinisherData {
-            chip_uid: runners[0].1.clone(),
+            rfid_uid: runners[0].1.clone(),
             position: 1,
         },
         solarun_temp::instructions::process_refunds::FinisherData {
-            chip_uid: runners[1].1.clone(),
+            rfid_uid: runners[1].1.clone(),
             position: 2,
         },
     ];

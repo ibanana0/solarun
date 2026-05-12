@@ -85,13 +85,13 @@ function RegisterPageContent() {
   const program = useProgram();
 
   const [fullName, setFullName] = useState("");
-  const [chipUid, setChipUid] = useState("");
+  const [rfidUid, setRfidUid] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<{
     eventId: string;
     txSignature?: string;
   } | null>(null);
-  const [usedChips, setUsedChips] = useState<string[]>([]);
+  const [usedRfids, setUsedRfids] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
 
   // Dialog state
@@ -164,9 +164,9 @@ function RegisterPageContent() {
     if (!eventId) return;
     supabase
       .from("runners")
-      .select("chip_uid")
+      .select("rfid_uid")
       .eq("event_id", eventId)
-      .then(({ data }) => setUsedChips(data?.map((r) => r.chip_uid) ?? []));
+      .then(({ data }) => setUsedRfids(data?.map((r) => r.rfid_uid) ?? []));
   }, [eventId]);
 
   const handleCopyAddress = () => {
@@ -178,18 +178,26 @@ function RegisterPageContent() {
   };
 
   const availableChips = DEMO_CHIP_UIDS.filter(
-    (uid) => !usedChips.includes(uid),
+    (uid) => !usedRfids.includes(uid),
   );
   const activeEvents = events?.filter((e) => e.status === "pending") ?? [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim()) {
-      showDialog("Validation Error", "Please enter your full name.", "error");
+    if (!fullName.trim() || fullName.length !== 4) {
+      showDialog(
+        "Validation Error",
+        "Please enter exactly a 4-character name.",
+        "error",
+      );
       return;
     }
-    if (!chipUid) {
-      showDialog("Validation Error", "Please select a Chip UID.", "error");
+    if (usedRfids.includes(fullName)) {
+      showDialog(
+        "Validation Error",
+        "This name is already registered for this event. Please choose another 4-character name.",
+        "error",
+      );
       return;
     }
     if (!eventId) {
@@ -235,7 +243,7 @@ function RegisterPageContent() {
         program.programId,
       );
       const [participantPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(chipUid)],
+        [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(rfidUid)],
         programId,
       );
 
@@ -273,7 +281,7 @@ function RegisterPageContent() {
       const txSignature = await program.methods
         .registerParticipant(
           blockchainEventId,
-          chipUid,
+          rfidUid,
           runner,
           fullName.trim(),
           runnerUuid,
@@ -295,7 +303,7 @@ function RegisterPageContent() {
       const { error: insertError } = await supabase.from("runners").insert({
         id: runnerUuid,
         full_name: fullName.trim(),
-        chip_uid: chipUid,
+        rfid_uid: rfidUid,
         event_id: eventId,
         wallet_address: walletAddress,
         status: "registered",
@@ -515,7 +523,7 @@ function RegisterPageContent() {
                         value={eventId}
                         onValueChange={(v) => {
                           setEventId(v);
-                          setChipUid("");
+                          setRfidUid("");
                         }}
                       >
                         <SelectTrigger id="event_id">
@@ -534,53 +542,40 @@ function RegisterPageContent() {
                 )}
               </div>
 
-              {/* Full Name */}
+              {/* Full Name / RFID ID */}
               <div className="space-y-2">
-                <Label htmlFor="full_name">Full Name</Label>
+                <Label htmlFor="full_name">Participant Name (Exactly 4 Characters)</Label>
                 <Input
                   id="full_name"
-                  placeholder="Your Name"
+                  placeholder="e.g. Budi"
                   value={fullName}
+                  maxLength={4}
                   onChange={(e) => {
-                    setFullName(e.target.value);
+                    const name = e.target.value;
+                    setFullName(name);
+                    setRfidUid(name); // Name is the Chip UID
                   }}
                   disabled={submitting}
                   autoComplete="name"
                 />
-              </div>
-
-              {/* Chip UID */}
-              <div className="space-y-2">
-                <Label htmlFor="chip_uid">RFID Chip UID</Label>
-                <Select
-                  value={chipUid}
-                  onValueChange={(v) => {
-                    setChipUid(v);
-                  }}
-                  disabled={!eventId}
-                >
-                  <SelectTrigger id="chip_uid">
-                    <SelectValue
-                      placeholder={
-                        !eventId
-                          ? "Select an event first"
-                          : "Select Chip UID..."
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableChips.map((uid) => (
-                      <SelectItem key={uid} value={uid}>
-                        {uid}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
                 <p className="text-xs text-muted-foreground">
-                  This chip is used for identification at each checkpoint.
-                  {eventId && ` (${availableChips.length} available)`}
+                  Your name will be used as your RFID ID. It must be exactly 4 characters and unique. (Case-sensitive)
                 </p>
               </div>
+
+              {usedRfids.includes(fullName) && fullName.length === 4 && (
+                <div className="flex items-center gap-2 p-2 text-xs border rounded bg-destructive/10 border-destructive/20 text-destructive">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>This name is already registered for this event. Please use a slightly different name.</span>
+                </div>
+              )}
+
+              {fullName.length > 0 && fullName.length !== 4 && (
+                <div className="flex items-center gap-2 p-2 text-xs border rounded bg-orange-500/10 border-orange-500/20 text-orange-600 dark:text-orange-400">
+                  <Info className="w-4 h-4" />
+                  <span>Name must be exactly 4 characters (currently {fullName.length}).</span>
+                </div>
+              )}
 
               {event && event.status === "pending" && !isBalanceSufficient && (
                 <div className="p-3 text-sm border rounded-lg bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-300">

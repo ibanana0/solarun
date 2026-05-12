@@ -76,7 +76,7 @@
               },
               {
                 "kind": "arg",
-                "path": "chip_uid"
+                "path": "rfid_uid"
               }
             ]
           }
@@ -88,7 +88,7 @@
           "type": "string"
         },
         {
-          "name": "chip_uid",
+          "name": "rfid_uid",
           "type": "string"
         }
       ]
@@ -906,7 +906,7 @@
               },
               {
                 "kind": "arg",
-                "path": "chip_uid"
+                "path": "rfid_uid"
               }
             ]
           }
@@ -918,7 +918,7 @@
           "type": "string"
         },
         {
-          "name": "chip_uid",
+          "name": "rfid_uid",
           "type": "string"
         },
         {
@@ -1005,7 +1005,7 @@
               },
               {
                 "kind": "arg",
-                "path": "chip_uid"
+                "path": "rfid_uid"
               }
             ]
           }
@@ -1057,7 +1057,7 @@
           "type": "string"
         },
         {
-          "name": "chip_uid",
+          "name": "rfid_uid",
           "type": "string"
         },
         {
@@ -1890,7 +1890,7 @@
             "type": "string"
           },
           {
-            "name": "chip_uid",
+            "name": "rfid_uid",
             "type": "string"
           },
           {
@@ -2078,7 +2078,7 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "chip_uid",
+            "name": "rfid_uid",
             "type": "string"
           },
           {
@@ -2138,7 +2138,7 @@
             "type": "pubkey"
           },
           {
-            "name": "chip_uid",
+            "name": "rfid_uid",
             "type": "string"
           },
           {
@@ -2198,7 +2198,7 @@
             "type": "pubkey"
           },
           {
-            "name": "chip_uid",
+            "name": "rfid_uid",
             "type": "string"
           },
           {

@@ -168,7 +168,7 @@ export function LeaderboardTable({
                     <div className="flex flex-col gap-0.5">
                       <span className="font-medium">{runner.full_name}</span>
                       <span className="text-xs text-muted-foreground font-mono">
-                        {runner.chip_uid}
+                        {runner.rfid_uid}
                       </span>
                     </div>
                   </TableCell>

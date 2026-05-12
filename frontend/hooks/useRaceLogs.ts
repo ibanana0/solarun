@@ -6,7 +6,7 @@ import { supabase, type RaceLog } from '@/lib/supabase';
 export interface RaceLogWithRunner extends RaceLog {
     runners: {
         full_name: string;
-        chip_uid: string;
+        rfid_uid: string;
     };
 }
 
@@ -20,7 +20,7 @@ export function useRaceLogs(eventId: string) {
                     *,
                     runners!inner (
                         full_name,
-                        chip_uid
+                        rfid_uid
                     )
                 `)
                 .eq('runners.event_id', eventId)

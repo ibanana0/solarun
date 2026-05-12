@@ -86,14 +86,14 @@ async function testBatching() {
   console.log("⏳ Registering 20 runners...");
   const runners = [];
   for (let i = 0; i < 20; i++) {
-    // chip_uid must be <= 20 chars
+    // rfid_uid must be <= 20 chars
     // Using "B" + index + last 6 of timestamp
-    const chip_uid = `B${i}_${Date.now().toString().slice(-6)}`;
+    const rfid_uid = `B${i}_${Date.now().toString().slice(-6)}`;
 
     runners.push({
       event_id: event.id,
       full_name: `Runner ${i}`,
-      chip_uid: chip_uid,
+      rfid_uid: rfid_uid,
       wallet_address: Keypair.generate().publicKey.toBase58(),
       status: "registered",
     });

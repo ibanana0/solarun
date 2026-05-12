@@ -78,7 +78,7 @@ pub mod solarun_temp {
     pub fn register_participant(
         ctx: Context<RegisterParticipant>,
         event_id: String,
-        chip_uid: String,
+        rfid_uid: String,
         wallet_address: Pubkey,
         full_name: String,
         runner_id: String,
@@ -86,7 +86,7 @@ pub mod solarun_temp {
         register_participant::handler(
             ctx,
             event_id,
-            chip_uid,
+            rfid_uid,
             wallet_address,
             full_name,
             runner_id,
@@ -97,7 +97,7 @@ pub mod solarun_temp {
     pub fn record_finish(
         ctx: Context<RecordFinish>,
         event_id: String,
-        chip_uid: String,
+        rfid_uid: String,
         checkpoint_id: u8,
         finish_position: u8,
         timestamp: i64,
@@ -105,7 +105,7 @@ pub mod solarun_temp {
         record_finish::handler(
             ctx,
             event_id,
-            chip_uid,
+            rfid_uid,
             checkpoint_id,
             finish_position,
             timestamp,
@@ -145,13 +145,13 @@ pub mod solarun_temp {
         delete_event::handler(ctx, event_id, amounts, is_final_batch)
     }
 
-    /// Close a participant PDA to reclaim rent
+    /// Close a participant account and return rent to admin
     pub fn close_participant(
         ctx: Context<CloseParticipant>,
         event_id: String,
-        chip_uid: String,
+        rfid_uid: String,
     ) -> Result<()> {
-        close_participant::handler(ctx, event_id, chip_uid)
+        close_participant::handler(ctx, event_id, rfid_uid)
     }
 
     /// Slash admin stake and refund participants (on event failure)

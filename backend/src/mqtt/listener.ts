@@ -24,7 +24,7 @@ const MQTT_TOPIC = process.env.MQTT_TOPIC || 'race/checkpoint';
 
 interface QueueItem {
     eventId: string;
-    chipUid: string;
+    rfidUid: string;
     checkpointId: number;
     finishPosition: number;
     timestamp: number;
@@ -39,7 +39,7 @@ let isProcessingQueue = false;
  */
 function enqueueOnChainTx(item: QueueItem): void {
     txQueue.push(item);
-    console.log(`[Queue] 📥 Enqueued: ${item.chipUid} CP${item.checkpointId} (queue size: ${txQueue.length})`);
+    console.log(`[Queue] 📥 Enqueued: ${item.rfidUid} CP${item.checkpointId} (queue size: ${txQueue.length})`);
     processQueue(); // start processing if not already running
 }
 
@@ -53,12 +53,12 @@ async function processQueue(): Promise<void> {
 
     while (txQueue.length > 0) {
         const item = txQueue.shift()!;
-        console.log(`\n[Queue] ⚡ Processing: ${item.chipUid} CP${item.checkpointId} (${txQueue.length} remaining)`);
+        console.log(`\n[Queue] ⚡ Processing: ${item.rfidUid} CP${item.checkpointId} (${txQueue.length} remaining)`);
 
         try {
             const txSig = await recordFinishOnChain(
                 item.eventId,
-                item.chipUid,
+                item.rfidUid,
                 item.checkpointId,
                 item.finishPosition,
                 item.timestamp,
@@ -75,7 +75,7 @@ async function processQueue(): Promise<void> {
             console.log(`[Queue] 🔗 On-chain TX confirmed: ${txSig}`);
 
         } catch (chainErr: any) {
-            console.error(`[Queue] ❌ On-chain failed for ${item.chipUid} CP${item.checkpointId}: ${chainErr.message}`);
+            console.error(`[Queue] ❌ On-chain failed for ${item.rfidUid} CP${item.checkpointId}: ${chainErr.message}`);
             // DB data (race_logs, runner status) is already saved by the validator.
             // The on-chain call failing is logged but doesn't revert DB changes.
             // In production, you'd want a reconciliation/retry job.
@@ -184,7 +184,7 @@ export function startMqttListener(): void {
                     if (eventId) {
                         enqueueOnChainTx({
                             eventId,
-                            chipUid: message.rfid_uid,
+                            rfidUid: message.rfid_uid,
                             checkpointId: message.checkpoint_id,
                             finishPosition: result.finish_position ?? 0,
                             timestamp: typeof message.timestamp === 'number'

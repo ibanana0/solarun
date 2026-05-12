@@ -44,16 +44,18 @@ const CHECKPOINT_START = 0;
  * Returns a ValidationResult indicating success or failure with reason.
  */
 export async function validateCheckpoint(msg: CheckpointMessage): Promise<ValidationResult> {
-    const { rfid_uid, checkpoint_id } = msg;
+    const { checkpoint_id } = msg;
+    const rfid_uid = (msg.rfid_uid || '').trim(); // Remove .toUpperCase() to support case-sensitivity
+
     // Normalize timestamp: accept both epoch ms (number) and ISO string
     const timestamp = typeof msg.timestamp === 'number'
         ? new Date(msg.timestamp).toISOString()
         : msg.timestamp;
 
     // --- Input validation ---
-    if (!rfid_uid || rfid_uid.trim() === '') {
-        console.log(`[Validator] Validation failed: Missing or empty rfid_uid`);
-        return { valid: false, error: 'Missing or empty rfid_uid' };
+    if (!rfid_uid || rfid_uid.length !== 4) {
+        console.log(`[Validator] Validation failed: rfid_uid must be exactly 4 characters. Received: "${msg.rfid_uid}"`);
+        return { valid: false, error: 'rfid_uid must be exactly 4 characters' };
     }
 
     if (checkpoint_id < CHECKPOINT_START) {
@@ -66,30 +68,50 @@ export async function validateCheckpoint(msg: CheckpointMessage): Promise<Valida
         return { valid: false, error: 'Missing timestamp' };
     }
 
-    // --- Find runner by chip_uid and event_id ---
-    let query = supabase
-        .from('runners')
-        .select('id, status, chip_uid, event_id, finish_position')
-        .eq('chip_uid', rfid_uid);
+    // --- Find runner by rfid_uid ---
+    // Strategy: 
+    // 1. Try to find the runner in the specific event_id provided by sensor
+    // 2. Fallback: If not found or event_id missing, search for this rfid_uid in ANY currently ACTIVE event
+
+    let runner = null;
 
     if (msg.event_id) {
-        query = query.eq('event_id', msg.event_id);
-    } else {
-        // Fallback: If sensor doesn't provide event_id, assume the latest registration
-        query = query.order('created_at', { ascending: false });
+        const { data: specificRunners } = await supabase
+            .from('runners')
+            .select('id, status, rfid_uid, event_id, finish_position')
+            .eq('rfid_uid', rfid_uid)
+            .eq('event_id', msg.event_id)
+            .limit(1);
+
+        if (specificRunners && specificRunners.length > 0) {
+            runner = specificRunners[0];
+            console.log(`[Validator] 🎯 Found runner ${rfid_uid} in specific event: ${msg.event_id}`);
+        }
     }
-
-    const { data: runnersArray, error: runnerError } = await query.limit(1);
-
-    if (runnerError) {
-        console.error('[Validator] DB error querying runner:', runnerError.message);
-        return { valid: false, error: `Database error: ${runnerError.message}` };
-    }
-
-    const runner = runnersArray && runnersArray.length > 0 ? runnersArray[0] : null;
 
     if (!runner) {
-        return { valid: false, error: `Runner not found for chip_uid: ${rfid_uid}` };
+        // FALLBACK: Search in any active event
+        console.log(`[Validator] 🔍 Runner not found in specific event. Searching for "${rfid_uid}" in all ACTIVE events...`);
+
+        const { data: activeRunners, error: fallbackError } = await supabase
+            .from('runners')
+            .select('id, status, rfid_uid, event_id, finish_position, race_events!inner(status)')
+            .eq('rfid_uid', rfid_uid)
+            .eq('race_events.status', 'active')
+            .limit(1);
+
+        if (fallbackError) {
+            console.error('[Validator] Fallback query error:', fallbackError.message);
+        }
+
+        if (activeRunners && activeRunners.length > 0) {
+            runner = activeRunners[0];
+            console.log(`[Validator] ✨ Smart Match Success: Found runner ${rfid_uid} in active event: ${runner.event_id}`);
+        }
+    }
+
+    if (!runner) {
+        return { valid: false, error: `Runner "${rfid_uid}" is not registered in any active event.` };
     }
 
     // --- Check Event Cut-off Logic & Checkpoints ---
@@ -228,7 +250,7 @@ async function checkDuplicateTap(runnerId: string, checkpointId: number, timesta
 async function recordCheckpoint(
     runnerId: string,
     eventId: string,
-    chipUid: string,
+    rfidUid: string,
     checkpointId: number,
     timestamp: string,
     isFinish: boolean
@@ -261,7 +283,7 @@ async function recordCheckpoint(
             console.error('[Validator] Failed to update runner status to running:', error.message);
         }
 
-        console.log(`[Validator] ✅ Runner ${chipUid} started (checkpoint ${checkpointId})`);
+        console.log(`[Validator] ✅ Runner ${rfidUid} started (checkpoint ${checkpointId})`);
         return { valid: true, runner_id: runnerId, is_finish: false };
     }
 
@@ -292,11 +314,11 @@ async function recordCheckpoint(
             console.error('[Validator] Failed to update runner status to finished:', error.message);
         }
 
-        console.log(`[Validator] 🏁 Runner ${chipUid} FINISHED in position #${finishPosition}`);
+        console.log(`[Validator] 🏁 Runner ${rfidUid} FINISHED in position #${finishPosition}`);
         return { valid: true, runner_id: runnerId, is_finish: true, finish_position: finishPosition };
     }
 
     // Intermediate checkpoint
-    console.log(`[Validator] ✅ Runner ${chipUid} passed checkpoint ${checkpointId}`);
+    console.log(`[Validator] ✅ Runner ${rfidUid} passed checkpoint ${checkpointId}`);
     return { valid: true, runner_id: runnerId, is_finish: false };
 }

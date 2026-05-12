@@ -47,7 +47,7 @@ async function checkRunners(eventId: string) {
             const pos = r.finish_position ? `#${r.finish_position}`.padEnd(8) : '-'.padEnd(8);
             const tx = r.tx_signature ? r.tx_signature.slice(0, 16) + '...' : '-';
             console.log(
-                `${String(idx + 1).padEnd(2)} | ${(r.full_name || '').padEnd(15)} | ${(r.chip_uid || '').padEnd(11)} | ${(r.status || '').padEnd(10)} | ${pos} | ${tx}`
+                `${String(idx + 1).padEnd(2)} | ${(r.full_name || '').padEnd(15)} | ${(r.rfid_uid || '').padEnd(11)} | ${(r.status || '').padEnd(10)} | ${pos} | ${tx}`
             );
         });
     }

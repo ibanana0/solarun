@@ -300,7 +300,7 @@ async function processEventRefund(event: any) {
 
       // Add non-winners to this batch (they get 0 prize but update status in SC)
       for (const runner of batchNonWinners) {
-        nonFinishersChipUids.push(runner.chip_uid);
+        nonFinishersChipUids.push(runner.rfid_uid);
         runnerIdsInBatch.push(runner.id);
       }
 

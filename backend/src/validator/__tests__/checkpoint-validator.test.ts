@@ -14,8 +14,8 @@ describe('Checkpoint Validator', () => {
         ]);
 
         mockSupabase.setMockData('runners', [
-            { id: 'runner-1', chip_uid: 'CHIP_123', event_id: 'event-1', status: 'registered', finish_position: null },
-            { id: 'runner-2', chip_uid: 'CHIP_456', event_id: 'event-1', status: 'finished', finish_position: 1 },
+            { id: 'runner-1', rfid_uid: 'CHIP_123', event_id: 'event-1', status: 'registered', finish_position: null },
+            { id: 'runner-2', rfid_uid: 'CHIP_456', event_id: 'event-1', status: 'finished', finish_position: 1 },
         ]);
         
         mockSupabase.setMockData('race_logs', []);

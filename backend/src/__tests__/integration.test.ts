@@ -35,7 +35,7 @@ describe('Integration: MQTT → Validator → Database', () => {
         mockSupabase.setMockData('runners', [
             {
                 id: 'runner-1',
-                chip_uid: '08:1A:2B:3C',
+                rfid_uid: '08:1A:2B:3C',
                 wallet_address: 'ABC123',
                 full_name: 'Alice Runner',
                 event_id: 'event-1',
@@ -44,7 +44,7 @@ describe('Integration: MQTT → Validator → Database', () => {
             },
             {
                 id: 'runner-2',
-                chip_uid: '0D:2C:3D:4E',
+                rfid_uid: '0D:2C:3D:4E',
                 wallet_address: 'DEF456',
                 full_name: 'Bob Runner',
                 event_id: 'event-1',

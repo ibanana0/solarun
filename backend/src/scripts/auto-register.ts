@@ -154,7 +154,7 @@ async function run(eventId: string) {
     console.log(`\n===================================================`);
     console.log(`[${i + 1}/10] Registering ${RUNNER_NAMES[i]}...`);
     console.log(`===================================================`);
-    const chipUid = `CHIP_SIM_${(i + 1).toString().padStart(2, "0")}`;
+    const rfidUid = `CHIP_SIM_${(i + 1).toString().padStart(2, "0")}`;
     const walletPath = path.join(simWalletsDir, `runner${i + 1}.json`);
 
     // --- Load or create runner keypair ---
@@ -264,7 +264,7 @@ async function run(eventId: string) {
 
     // --- Step 3: Register On-Chain ---
     const [participantPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(chipUid)],
+      [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(rfidUid)],
       PROGRAM_ID,
     );
 
@@ -274,7 +274,7 @@ async function run(eventId: string) {
       regTx = await (runnerProgram.methods as any)
         .registerParticipant(
           cleanEventId,
-          chipUid,
+          rfidUid,
           runnerKeypair.publicKey,
           RUNNER_NAMES[i],
           `user_${i + 1}`,
@@ -308,7 +308,7 @@ async function run(eventId: string) {
     // --- Step 4: Insert into Supabase ---
     const { error } = await supabase.from("runners").insert({
       event_id: eventId,
-      chip_uid: chipUid,
+      rfid_uid: rfidUid,
       wallet_address: runnerKeypair.publicKey.toBase58(),
       full_name: RUNNER_NAMES[i],
       status: "registered",

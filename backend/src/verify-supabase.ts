@@ -38,7 +38,7 @@ async function verify() {
         return;
     }
     console.log(`   ✅ Found ${runners.length} runner(s)`);
-    runners.forEach(r => console.log(`      - ${r.full_name} (${r.chip_uid}) [${r.status}]`));
+    runners.forEach(r => console.log(`      - ${r.full_name} (${r.rfid_uid}) [${r.status}]`));
 
     // Test 3: Query race_logs
     console.log('\n📝 Test 3: Query race_logs...');

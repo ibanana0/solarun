@@ -25,8 +25,8 @@ async function testValidatorFlow() {
   // --- Get active event and runners ---
   const { data: runners, error } = await supabase
     .from("runners")
-    .select("chip_uid, full_name, status, event_id")
-    .order("chip_uid");
+    .select("rfid_uid, full_name, status, event_id")
+    .order("rfid_uid");
 
   if (error || !runners || runners.length === 0) {
     console.error(
@@ -38,7 +38,7 @@ async function testValidatorFlow() {
 
   console.log(`📋 Found ${runners.length} runners in DB:\n`);
   runners.forEach((r) =>
-    console.log(`   ${r.chip_uid} — ${r.full_name} [${r.status}]`),
+    console.log(`   ${r.rfid_uid} — ${r.full_name} [${r.status}]`),
   );
 
   // --- Reset runners to "registered" and clear race_logs for clean test ---
@@ -83,13 +83,13 @@ async function testValidatorFlow() {
 
   for (const runner of testRunners) {
     const msg: CheckpointMessage = {
-      rfid_uid: runner.chip_uid,
+      rfid_uid: runner.rfid_uid,
       checkpoint_id: 0,
       timestamp: new Date().toISOString(),
     };
     const result = await validateCheckpoint(msg);
     console.log(
-      `   ${runner.chip_uid}: ${result.valid ? "✅ PASS" : `❌ FAIL — ${result.error}`}`,
+      `   ${runner.rfid_uid}: ${result.valid ? "✅ PASS" : `❌ FAIL — ${result.error}`}`,
     );
   }
 
@@ -104,13 +104,13 @@ async function testValidatorFlow() {
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     const skipMsg: CheckpointMessage = {
-      rfid_uid: testRunners[0]!.chip_uid,
+      rfid_uid: testRunners[0]!.rfid_uid,
       checkpoint_id: maxCheckpoint, // skipping intermediate
       timestamp: new Date().toISOString(),
     };
     const skipResult = await validateCheckpoint(skipMsg);
     console.log(
-      `   ${testRunners[0]!.chip_uid}: ${skipResult.valid ? "❌ UNEXPECTED PASS" : `✅ Correctly rejected — ${skipResult.error}`}`,
+      `   ${testRunners[0]!.rfid_uid}: ${skipResult.valid ? "❌ UNEXPECTED PASS" : `✅ Correctly rejected — ${skipResult.error}`}`,
     );
   }
 
@@ -122,13 +122,13 @@ async function testValidatorFlow() {
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
   const dupMsg: CheckpointMessage = {
-    rfid_uid: testRunners[0]!.chip_uid,
+    rfid_uid: testRunners[0]!.rfid_uid,
     checkpoint_id: 0, // same as already recorded
     timestamp: new Date().toISOString(),
   };
   const dupResult = await validateCheckpoint(dupMsg);
   console.log(
-    `   ${testRunners[0]!.chip_uid}: ${dupResult.valid ? "❌ UNEXPECTED PASS" : `✅ Correctly rejected — ${dupResult.error}`}`,
+    `   ${testRunners[0]!.rfid_uid}: ${dupResult.valid ? "❌ UNEXPECTED PASS" : `✅ Correctly rejected — ${dupResult.error}`}`,
   );
 
   // =========================================================================
@@ -143,13 +143,13 @@ async function testValidatorFlow() {
 
     for (const runner of testRunners) {
       const msg: CheckpointMessage = {
-        rfid_uid: runner.chip_uid,
+        rfid_uid: runner.rfid_uid,
         checkpoint_id: cp,
         timestamp: new Date().toISOString(),
       };
       const result = await validateCheckpoint(msg);
       console.log(
-        `   ${runner.chip_uid}: ${result.valid ? "✅ PASS" : `❌ FAIL — ${result.error}`}`,
+        `   ${runner.rfid_uid}: ${result.valid ? "✅ PASS" : `❌ FAIL — ${result.error}`}`,
       );
     }
   }
@@ -164,13 +164,13 @@ async function testValidatorFlow() {
   for (let i = 0; i < testRunners.length; i++) {
     const runner = testRunners[i]!;
     const msg: CheckpointMessage = {
-      rfid_uid: runner.chip_uid,
+      rfid_uid: runner.rfid_uid,
       checkpoint_id: maxCheckpoint,
       timestamp: new Date().toISOString(),
     };
     const result = await validateCheckpoint(msg);
     console.log(
-      `   ${runner.chip_uid}: ${result.valid ? `✅ FINISHED #${result.finish_position}` : `❌ FAIL — ${result.error}`}`,
+      `   ${runner.rfid_uid}: ${result.valid ? `✅ FINISHED #${result.finish_position}` : `❌ FAIL — ${result.error}`}`,
     );
     await sleep(100); // slight delay between finishers
   }
@@ -183,13 +183,13 @@ async function testValidatorFlow() {
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
   const alreadyFinished: CheckpointMessage = {
-    rfid_uid: testRunners[0]!.chip_uid,
+    rfid_uid: testRunners[0]!.rfid_uid,
     checkpoint_id: maxCheckpoint,
     timestamp: new Date().toISOString(),
   };
   const finishedResult = await validateCheckpoint(alreadyFinished);
   console.log(
-    `   ${testRunners[0]!.chip_uid}: ${finishedResult.valid ? "❌ UNEXPECTED PASS" : `✅ Correctly rejected — ${finishedResult.error}`}`,
+    `   ${testRunners[0]!.rfid_uid}: ${finishedResult.valid ? "❌ UNEXPECTED PASS" : `✅ Correctly rejected — ${finishedResult.error}`}`,
   );
 
   // =========================================================================
@@ -218,13 +218,13 @@ async function testValidatorFlow() {
 
   const { data: finalRunners } = await supabase
     .from("runners")
-    .select("chip_uid, full_name, status, finish_position")
-    .order("chip_uid");
+    .select("rfid_uid, full_name, status, finish_position")
+    .order("rfid_uid");
 
   console.log("   Runners:");
   finalRunners?.forEach((r) => {
     const pos = r.finish_position ? ` (#${r.finish_position})` : "";
-    console.log(`   ${r.chip_uid} — ${r.full_name} [${r.status}]${pos}`);
+    console.log(`   ${r.rfid_uid} — ${r.full_name} [${r.status}]${pos}`);
   });
 
   const { data: logs } = await supabase

@@ -71,7 +71,7 @@ async function simulate() {
             .from('runners')
             .insert({
                 full_name: runnerNames[i],
-                chip_uid: chips[i],
+                rfid_uid: chips[i],
                 wallet_address: walletAddress,
                 event_id: event.id,
                 status: 'registered'
@@ -80,14 +80,14 @@ async function simulate() {
             .single();
         if (rError) throw rError;
         runners.push(runner);
-        console.log(`   👤 Registered: ${runner.full_name} (${runner.chip_uid})`);
+        console.log(`   👤 Registered: ${runner.full_name} (${runner.rfid_uid})`);
     }
     console.log('');
 
     // 3. START RACE (Checkpoint 0)
     console.log('Step 3: Race Started! Runners hitting Start Checkpoint (0)...');
     for (const r of runners) {
-        await validateCheckpoint({ rfid_uid: r.chip_uid, checkpoint_id: 0, timestamp: new Date().toISOString() });
+        await validateCheckpoint({ rfid_uid: r.rfid_uid, checkpoint_id: 0, timestamp: new Date().toISOString() });
         console.log(`   🏁 ${r.full_name} started.`);
     }
     await sleep(1000);
@@ -95,7 +95,7 @@ async function simulate() {
     // 4. MID POINT (Checkpoint 1)
     console.log('\nStep 4: Runners passing Mid-Point (1)...');
     for (const r of runners) {
-        await validateCheckpoint({ rfid_uid: r.chip_uid, checkpoint_id: 1, timestamp: new Date().toISOString() });
+        await validateCheckpoint({ rfid_uid: r.rfid_uid, checkpoint_id: 1, timestamp: new Date().toISOString() });
         console.log(`   📍 ${r.full_name} passed intermediate point.`);
     }
     await sleep(1000);
@@ -105,7 +105,7 @@ async function simulate() {
     // Alice 1st, Bob 2nd, Charlie 3rd
     for (let i = 0; i < runners.length; i++) {
         const r = runners[i];
-        const res = await validateCheckpoint({ rfid_uid: r.chip_uid, checkpoint_id: 2, timestamp: new Date().toISOString() });
+        const res = await validateCheckpoint({ rfid_uid: r.rfid_uid, checkpoint_id: 2, timestamp: new Date().toISOString() });
         console.log(`   🏆 ${r.full_name} FINISHED #${res.finish_position}`);
         await sleep(500);
     }

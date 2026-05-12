@@ -509,13 +509,13 @@ export interface CloseParticipantParams {
   eventId: string;
   programId: string;
   adminWallet: PublicKey;
-  chipUid: string;
+  rfidUid: string;
 }
 
 export async function buildCloseParticipantInstruction(
   params: CloseParticipantParams,
 ): Promise<anchor.web3.TransactionInstruction> {
-  const { eventId, adminWallet, programId, chipUid } = params;
+  const { eventId, adminWallet, programId, rfidUid } = params;
 
   const cleanEventId = eventId.replace(/-/g, "");
 
@@ -537,12 +537,12 @@ export async function buildCloseParticipantInstruction(
     );
 
     const [participantPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(chipUid)],
+      [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(rfidUid)],
       program.programId,
     );
 
     const instruction = await (program.methods as any)
-      .closeParticipant(cleanEventId, chipUid)
+      .closeParticipant(cleanEventId, rfidUid)
       .accounts({
         admin: adminWallet,
         event: eventPda,
@@ -553,7 +553,7 @@ export async function buildCloseParticipantInstruction(
     return instruction;
   } catch (error) {
     console.error(
-      `❌ Error building closeParticipant instruction for chip ${chipUid}:`,
+      `❌ Error building closeParticipant instruction for chip ${rfidUid}:`,
       error,
     );
     throw error;
@@ -586,7 +586,7 @@ function delay(ms: number): Promise<void> {
  */
 export async function recordFinishOnChain(
   eventId: string,
-  chipUid: string,
+  rfidUid: string,
   checkpointId: number,
   finishPosition: number,
   timestamp: number,
@@ -611,20 +611,20 @@ export async function recordFinishOnChain(
   );
 
   const [participantPda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(chipUid)],
+    [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(rfidUid)],
     program.programId,
   );
 
   console.log(`[Blockchain] 📡 Calling record_finish on-chain...`);
   console.log(
-    `   Event: ${cleanEventId}, Chip: ${chipUid}, CP: ${checkpointId}, Pos: ${finishPosition}`,
+    `   Event: ${cleanEventId}, Chip: ${rfidUid}, CP: ${checkpointId}, Pos: ${finishPosition}`,
   );
 
   // Build the transaction instruction manually for retry control
   const instruction = await (program.methods as any)
     .recordFinish(
       cleanEventId,
-      chipUid,
+      rfidUid,
       checkpointId,
       finishPosition,
       new anchor.BN(timestamp),
@@ -709,7 +709,7 @@ export async function recordFinishOnChain(
  */
 export async function getParticipantOnChain(
   eventId: string,
-  chipUid: string,
+  rfidUid: string,
 ): Promise<any | null> {
   const cleanEventId = eventId.replace(/-/g, "");
   const programId = process.env.SOLARUN_PROGRAM_ID;
@@ -729,7 +729,7 @@ export async function getParticipantOnChain(
   );
 
   const [participantPda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(chipUid)],
+    [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(rfidUid)],
     program.programId,
   );
 

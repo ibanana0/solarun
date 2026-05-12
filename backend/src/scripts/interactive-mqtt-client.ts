@@ -30,7 +30,7 @@ interface CheckpointDef {
 
 interface RunnerState {
     name: string;
-    chipUid: string;
+    rfidUid: string;
     walletAddress: string;
     dbRunnerId: string;       // Supabase runner ID (for race_logs lookup)
     lastCheckpoint: number;   // -1 = not started, 0 = started, etc.
@@ -134,10 +134,10 @@ async function fetchHybridState() {
 
     console.log(`📍 Event has ${checkpointDefs.length} checkpoints: ${checkpointDefs.map(d => `${d.command}(CP${d.id}:${d.label})`).join(' → ')}`);
 
-    // 3. Fetch runners from Supabase (to get chip_uid + runner_id mapping)
+    // 3. Fetch runners from Supabase (to get rfid_uid + runner_id mapping)
     const { data: dbRunners, error } = await supabase
         .from('runners')
-        .select('id, full_name, chip_uid, wallet_address, status, finish_position')
+        .select('id, full_name, rfid_uid, wallet_address, status, finish_position')
         .eq('event_id', eventId)
         .order('created_at', { ascending: true });
 
@@ -158,7 +158,7 @@ async function fetchHybridState() {
         // --- Source A: On-chain PDA (major status: Registered / Running / Finished) ---
         try {
             const [participantPda] = PublicKey.findProgramAddressSync(
-                [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(r.chip_uid)],
+                [Buffer.from("participant"), eventPda.toBuffer(), Buffer.from(r.rfid_uid)],
                 PROGRAM_ID
             );
 
@@ -206,7 +206,7 @@ async function fetchHybridState() {
 
         runners.push({
             name: r.full_name,
-            chipUid: r.chip_uid,
+            rfidUid: r.rfid_uid,
             walletAddress: r.wallet_address,
             dbRunnerId: r.id,
             lastCheckpoint: lastCp,
@@ -229,7 +229,7 @@ function printStatus() {
     runners.forEach((r, idx) => {
         const num = String(idx + 1).padStart(2);
         const name = r.name.padEnd(12).slice(0, 12);
-        const chip = r.chipUid.padEnd(12).slice(0, 12);
+        const chip = r.rfidUid.padEnd(12).slice(0, 12);
         const status = r.status.padEnd(14).slice(0, 14);
         const pos = r.finishPosition ? `#${r.finishPosition}`.padEnd(8) : '   -    ';
         console.log(`│ ${num} │ ${name} │ ${chip} │ ${status} │ ${pos} │`);
@@ -298,7 +298,7 @@ function sendCheckpoint(runner: RunnerState, runnerIndex: number, checkpointId: 
 
     const payload = {
         event_id: eventId,
-        rfid_uid: runner.chipUid,
+        rfid_uid: runner.rfidUid,
         checkpoint_id: checkpointId,
         timestamp: Date.now(),
         sensor_id: `sim_sensor_cp${checkpointId}`,

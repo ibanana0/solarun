@@ -5,7 +5,7 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 /// Register a participant for an event (pays USDC registration fee)
 #[derive(Accounts)]
-#[instruction(event_id: String, chip_uid: String)]
+#[instruction(event_id: String, rfid_uid: String)]
 pub struct RegisterParticipant<'info> {
     #[account(mut)]
     pub runner: Signer<'info>,
@@ -22,7 +22,7 @@ pub struct RegisterParticipant<'info> {
         init,
         payer = runner,
         space = 8 + 400,
-        seeds = [b"participant", event.key().as_ref(), chip_uid.as_bytes()],
+        seeds = [b"participant", event.key().as_ref(), rfid_uid.as_bytes()],
         bump
     )]
     pub participant: Account<'info, Participant>,
@@ -50,7 +50,7 @@ pub struct RegisterParticipant<'info> {
 pub fn handler(
     ctx: Context<RegisterParticipant>,
     event_id: String,
-    chip_uid: String,
+    rfid_uid: String,
     wallet_address: Pubkey,
     full_name: String,
     runner_id: String,
@@ -69,7 +69,7 @@ pub fn handler(
         ErrorCode::MaxParticipantsReached
     );
 
-    if chip_uid.is_empty() || chip_uid.len() > 20 {
+    if rfid_uid.len() != 4 {
         return Err(ErrorCode::InvalidChipUid.into());
     }
 
@@ -88,7 +88,7 @@ pub fn handler(
     let participant = &mut ctx.accounts.participant;
     participant.runner_id = runner_id;
     participant.wallet = wallet_address;
-    participant.chip_uid = chip_uid.clone();
+    participant.rfid_uid = rfid_uid.clone();
     participant.full_name = full_name;
     participant.finish_position = None;
     participant.status = ParticipantStatus::Registered;
@@ -123,13 +123,13 @@ pub fn handler(
     emit!(ParticipantRegistered {
         event_id: event_id.clone(),
         wallet: wallet_address,
-        chip_uid: chip_uid.clone(),
+        rfid_uid: rfid_uid.clone(),
         fee_paid: fee,
     });
 
     msg!(
         "Participant registered: {} for event: {}",
-        chip_uid,
+        rfid_uid,
         event_id
     );
     Ok(())
@@ -139,6 +139,6 @@ pub fn handler(
 pub struct ParticipantRegistered {
     pub event_id: String,
     pub wallet: Pubkey,
-    pub chip_uid: String,
+    pub rfid_uid: String,
     pub fee_paid: u64,
 }

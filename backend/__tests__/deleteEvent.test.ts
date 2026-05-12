@@ -46,7 +46,7 @@ describe('DELETE /api/events/:id', () => {
             .from('runners')
             .insert([
                 {
-                    chip_uid: 'TEST_CHIP_001',
+                    rfid_uid: 'TEST_CHIP_001',
                     wallet_address: 'wallet_001',
                     full_name: 'Test Runner 1',
                     event_id: TEST_EVENT_ID,
@@ -54,7 +54,7 @@ describe('DELETE /api/events/:id', () => {
                     finish_position: null,
                 },
                 {
-                    chip_uid: 'TEST_CHIP_002',
+                    rfid_uid: 'TEST_CHIP_002',
                     wallet_address: 'wallet_002',
                     full_name: 'Test Runner 2',
                     event_id: TEST_EVENT_ID,
