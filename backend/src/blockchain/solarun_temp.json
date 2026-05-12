@@ -289,7 +289,9 @@
     {
       "name": "delete_event",
       "docs": [
-        "Delete an event and return remaining funds"
+        "Cancel and delete a pending event, refunding participants 100%.",
+        "- `amounts`: refund amount (in token units) for each ATA in remaining_accounts.",
+        "- `is_final_batch`: when true, closes the vault and event accounts after refunding."
       ],
       "discriminator": [
         103,
@@ -309,6 +311,9 @@
         },
         {
           "name": "event",
+          "docs": [
+            "Event PDA — NOT auto-closed here; manually closed on the final batch."
+          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -332,7 +337,7 @@
         {
           "name": "vault",
           "docs": [
-            "Vault token account to be closed."
+            "Vault token account that holds registration fees + admin stake."
           ],
           "writable": true,
           "pda": {
@@ -357,7 +362,7 @@
         {
           "name": "admin_token_account",
           "docs": [
-            "Admin's USDC token account to receive remaining funds."
+            "Admin's USDC token account — receives the stake return on final batch."
           ],
           "writable": true
         },
@@ -370,6 +375,16 @@
         {
           "name": "event_id",
           "type": "string"
+        },
+        {
+          "name": "amounts",
+          "type": {
+            "vec": "u64"
+          }
+        },
+        {
+          "name": "is_final_batch",
+          "type": "bool"
         }
       ]
     },
@@ -1877,6 +1892,16 @@
       "code": 6044,
       "name": "NoStakeToRelease",
       "msg": "No stake to release"
+    },
+    {
+      "code": 6045,
+      "name": "EventMustBePending",
+      "msg": "E0070: Event must be in Initialized (Pending) status to delete"
+    },
+    {
+      "code": 6046,
+      "name": "InsufficientVaultForRefunds",
+      "msg": "E0071: Vault has insufficient funds to cover all participant refunds"
     }
   ],
   "types": [
@@ -2006,8 +2031,16 @@
             "type": "pubkey"
           },
           {
-            "name": "remaining_returned",
+            "name": "participants_refunded",
+            "type": "u32"
+          },
+          {
+            "name": "stake_returned",
             "type": "u64"
+          },
+          {
+            "name": "is_final",
+            "type": "bool"
           }
         ]
       }

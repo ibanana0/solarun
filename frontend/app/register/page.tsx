@@ -87,7 +87,6 @@ function RegisterPageContent() {
   const [fullName, setFullName] = useState("");
   const [chipUid, setChipUid] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{
     eventId: string;
     txSignature?: string;
@@ -185,26 +184,31 @@ function RegisterPageContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     if (!fullName.trim()) {
-      setError("Nama lengkap harus diisi.");
+      showDialog("Validation Error", "Please enter your full name.", "error");
       return;
     }
     if (!chipUid) {
-      setError("Pilih Chip UID.");
+      showDialog("Validation Error", "Please select a Chip UID.", "error");
       return;
     }
     if (!eventId) {
-      setError("Pilih event terlebih dahulu.");
+      showDialog("Validation Error", "Please select an event first.", "error");
       return;
     }
     if (!walletAddress || !program) {
-      setError("Wallet/Program belum tersedia. Coba login ulang.");
+      showDialog(
+        "Error",
+        "Wallet/Program not available. Please log in again.",
+        "error",
+      );
       return;
     }
     if (isCreator) {
-      setError(
-        "Creator event tidak dapat mendaftar sebagai peserta di eventnya sendiri.",
+      showDialog(
+        "Error",
+        "Event creators cannot register as participants in their own event.",
+        "error",
       );
       return;
     }
@@ -220,7 +224,7 @@ function RegisterPageContent() {
       const runner = program.provider.publicKey;
 
       if (!runner) {
-        showDialog("Error", "Provider publicKey tidak tersedia.", "error");
+        showDialog("Error", "Provider publicKey not available.", "error");
         setSubmitting(false);
         return;
       }
@@ -242,10 +246,9 @@ function RegisterPageContent() {
         await program.provider.connection.getAccountInfo(participantPda);
 
       if (existingAccount !== null) {
-        // Jika accountInfo tidak null, berarti PDA ini sudah ada (sudah di-init)
         showDialog(
-          "Chip Sudah Terdaftar",
-          "Chip ini sudah terdaftar untuk event ini di blockchain.",
+          "Chip Already Registered",
+          "This chip is already registered for this event on the blockchain.",
           "warning",
         );
         setSubmitting(false);
@@ -303,22 +306,22 @@ function RegisterPageContent() {
       if (insertError) {
         const msg =
           insertError.code === "23505"
-            ? "Chip UID ini sudah digunakan. Pilih chip lain."
-            : `Berhasil di blockchain, tapi gagal simpan ke DB: ${insertError.message}`;
-        showDialog("Error Pendaftaran", msg, "error");
+            ? "Chip UID already in use. Please select a different chip."
+            : `Saved on-chain, but failed to save to DB: ${insertError.message}`;
+        showDialog("Registration Error", msg, "error");
         return;
       }
       setSuccess({ eventId, txSignature: txSignature });
       showDialog(
-        "Pendaftaran Berhasil!",
-        "Pendaftaran kamu telah berhasil diproses secara on-chain.",
+        "Registration Successful!",
+        "Your registration has been processed on-chain.",
         "success",
       );
     } catch (err: any) {
       console.error("Failed to register:", err);
       showDialog(
-        "Pendaftaran Gagal",
-        `Terjadi kesalahan: ${err.message || "Coba lagi."}`,
+        "Registration Failed",
+        `An error occurred: ${err.message || "Please try again."}`,
         "error",
       );
     } finally {
@@ -342,13 +345,12 @@ function RegisterPageContent() {
         <Card>
           <CardContent className="pt-6 space-y-4 text-center">
             <LogIn className="w-12 h-12 mx-auto opacity-40" />
-            <CardTitle>Login untuk Mendaftar</CardTitle>
+            <CardTitle>Login to Register</CardTitle>
             <CardDescription>
-              Kamu perlu login terlebih dahulu sebelum bisa mendaftar event
-              marathon.
+              You need to log in before you can register for a marathon event.
             </CardDescription>
             <Button onClick={login} className="w-full">
-              <LogIn className="w-4 h-4 mr-2" /> Login dengan Google / Email
+              <LogIn className="w-4 h-4 mr-2" /> Login with Google / Email
             </Button>
           </CardContent>
         </Card>
@@ -361,7 +363,7 @@ function RegisterPageContent() {
     <div className="container max-w-md py-8 space-y-6">
       <Button variant="ghost" size="sm" asChild>
         <Link href="/">
-          <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
+          <ArrowLeft className="w-4 h-4 mr-2" /> Back
         </Link>
       </Button>
 
@@ -373,19 +375,17 @@ function RegisterPageContent() {
               <AlertCircle className="w-5 h-5 text-orange-500 mt-0.5 flex-shrink-0" />
               <div className="space-y-1">
                 <CardTitle className="text-base text-orange-600 dark:text-orange-400">
-                  Kamu adalah Creator Event Ini
+                  You are the Creator of This Event
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Creator tidak diizinkan mendaftar sebagai peserta di event
-                  yang dibuatnya sendiri. Hal ini untuk menjaga fairness dan
-                  kepercayaan peserta lain.
+                  Creators are not allowed to register as participants in their
+                  own events. This ensures fairness and trust for all other
+                  participants.
                 </CardDescription>
               </div>
             </div>
             <Button asChild variant="outline" className="w-full">
-              <Link href={`/event/${event.id}`}>
-                ← Kembali ke Dashboard Event
-              </Link>
+              <Link href={`/event/${event.id}`}>← Back to Event Dashboard</Link>
             </Button>
           </CardContent>
         </Card>
@@ -395,19 +395,19 @@ function RegisterPageContent() {
         <Card>
           <CardContent className="pt-6 space-y-4 text-center">
             <CheckCircle className="w-12 h-12 mx-auto text-green-500" />
-            <CardTitle>Pendaftaran Berhasil! 🎉</CardTitle>
+            <CardTitle>Registration Successful! 🎉</CardTitle>
             <CardDescription>
-              Ambil chip RFID kamu di lokasi race dan mulai berlari!
+              Pick up your RFID chip at the race location and start running!
             </CardDescription>
             {success.txSignature && (
               <div className="p-4 mt-4 space-y-2 text-sm text-left border border-green-200 rounded-lg bg-green-50/50 dark:bg-green-950/20 dark:border-green-900">
                 <div className="flex items-center gap-2 font-medium text-green-600 dark:text-green-400">
                   <CheckCircle className="w-4 h-4" />
-                  <span>Pendaftaran Tersimpan On-Chain</span>
+                  <span>Registration Saved On-Chain</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Biaya pendaftaran (USDC/SOL) telah berhasil ditransfer ke
-                  vault smart contract.
+                  Registration fee (USDC/SOL) has been successfully transferred
+                  to the smart contract vault.
                 </p>
                 <a
                   href={`https://explorer.solana.com/tx/${success.txSignature}?cluster=devnet`}
@@ -415,18 +415,16 @@ function RegisterPageContent() {
                   rel="noreferrer"
                   className="inline-block w-full mt-1 font-mono text-xs text-green-600 truncate dark:text-green-400 hover:underline"
                 >
-                  ↗ Verifikasi di Solana Explorer
+                  ↗ Verify on Solana Explorer
                 </a>
               </div>
             )}
             <div className="flex justify-center gap-2 pt-2">
               <Button asChild>
-                <Link href={`/event/${success.eventId}`}>
-                  Lihat Leaderboard
-                </Link>
+                <Link href={`/event/${success.eventId}`}>View Leaderboard</Link>
               </Button>
               <Button variant="outline" asChild>
-                <Link href="/">Kembali ke Home</Link>
+                <Link href="/">Back to Home</Link>
               </Button>
             </div>
           </CardContent>
@@ -434,16 +432,16 @@ function RegisterPageContent() {
       ) : (
         <Card>
           <CardHeader className="pb-4">
-            <CardTitle>Daftar Event Marathon</CardTitle>
+            <CardTitle>Register for Marathon Event</CardTitle>
             <CardDescription>
-              Isi form di bawah untuk mendaftarkan diri.
+              Fill in the form below to register.
             </CardDescription>
 
             <div className="pt-4 mt-4 border-t">
               <button
                 onClick={handleCopyAddress}
                 className="flex items-center justify-between w-full p-2 text-left transition-colors border border-transparent rounded-md bg-secondary/50 hover:bg-secondary group hover:border-border"
-                title="Salin alamat wallet"
+                title="Copy wallet address"
               >
                 <div className="flex flex-col">
                   <span className="text-[10px] uppercase text-muted-foreground font-bold leading-none mb-1">
@@ -485,14 +483,14 @@ function RegisterPageContent() {
                             {eventDetails.name}
                           </h3>
                           <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-                            {eventDetails.description || "Tidak ada deskripsi."}
+                            {eventDetails.description || "No description."}
                           </p>
                         </div>
                       </div>
                       <Separator className="bg-primary/10" />
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-muted-foreground">
-                          Biaya Registrasi
+                          Registration Fee
                         </span>
                         <span className="font-bold text-blue-600 dark:text-blue-400">
                           {eventDetails.registration_fee_sol} USDC
@@ -500,19 +498,17 @@ function RegisterPageContent() {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-destructive">
-                      Event tidak ditemukan.
-                    </p>
+                    <p className="text-sm text-destructive">Event not found.</p>
                   )
                 ) : (
                   <div className="space-y-2">
                     {eventsLoading ? (
                       <p className="text-sm text-muted-foreground">
-                        Memuat events...
+                        Loading events...
                       </p>
                     ) : activeEvents.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
-                        Tidak ada event aktif saat ini.
+                        No active events at the moment.
                       </p>
                     ) : (
                       <Select
@@ -520,11 +516,10 @@ function RegisterPageContent() {
                         onValueChange={(v) => {
                           setEventId(v);
                           setChipUid("");
-                          setError(null);
                         }}
                       >
                         <SelectTrigger id="event_id">
-                          <SelectValue placeholder="Pilih event..." />
+                          <SelectValue placeholder="Select an event..." />
                         </SelectTrigger>
                         <SelectContent>
                           {activeEvents.map((event) => (
@@ -541,14 +536,13 @@ function RegisterPageContent() {
 
               {/* Full Name */}
               <div className="space-y-2">
-                <Label htmlFor="full_name">Nama Lengkap</Label>
+                <Label htmlFor="full_name">Full Name</Label>
                 <Input
                   id="full_name"
                   placeholder="Your Name"
                   value={fullName}
                   onChange={(e) => {
                     setFullName(e.target.value);
-                    setError(null);
                   }}
                   disabled={submitting}
                   autoComplete="name"
@@ -557,19 +551,20 @@ function RegisterPageContent() {
 
               {/* Chip UID */}
               <div className="space-y-2">
-                <Label htmlFor="chip_uid">Chip RFID UID</Label>
+                <Label htmlFor="chip_uid">RFID Chip UID</Label>
                 <Select
                   value={chipUid}
                   onValueChange={(v) => {
                     setChipUid(v);
-                    setError(null);
                   }}
                   disabled={!eventId}
                 >
                   <SelectTrigger id="chip_uid">
                     <SelectValue
                       placeholder={
-                        !eventId ? "Pilih event dulu" : "Pilih Chip UID..."
+                        !eventId
+                          ? "Select an event first"
+                          : "Select Chip UID..."
                       }
                     />
                   </SelectTrigger>
@@ -582,33 +577,31 @@ function RegisterPageContent() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Chip ini digunakan untuk identifikasi di setiap checkpoint.
-                  {eventId && ` (${availableChips.length} tersedia)`}
+                  This chip is used for identification at each checkpoint.
+                  {eventId && ` (${availableChips.length} available)`}
                 </p>
               </div>
 
-              {error && <p className="text-sm text-destructive">{error}</p>}
-
               {event && event.status === "pending" && !isBalanceSufficient && (
                 <div className="p-3 text-sm border rounded-lg bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-300">
-                  <p className="font-semibold mb-1">⚠️ Saldo Tidak Mencukupi</p>
+                  <p className="font-semibold mb-1">⚠️ Insufficient Balance</p>
                   <ul className="list-disc pl-4 space-y-1 text-xs">
                     {!hasEnoughUsdc && (
                       <li>
-                        Saldo Mock USDC: {usdcBalance.toFixed(2)} (Butuh{" "}
+                        Mock USDC Balance: {usdcBalance.toFixed(2)} (Need{" "}
                         {feeRequired})
                       </li>
                     )}
                     {!hasEnoughSol && (
                       <li>
-                        Saldo SOL (Gas): {solBalance.toFixed(3)} (Butuh &gt;
+                        SOL Balance (Gas): {solBalance.toFixed(3)} (Need &gt;
                         0.005 SOL)
                       </li>
                     )}
                   </ul>
                   <p className="mt-2 text-xs opacity-80">
-                    Gunakan tombol "Faucet USDC" di menu atas jika butuh Mock
-                    USDC.
+                    Use the "Faucet USDC" button in the menu above if you need
+                    Mock USDC.
                   </p>
                 </div>
               )}
@@ -626,7 +619,7 @@ function RegisterPageContent() {
                 {submitting ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />{" "}
-                    Mendaftarkan...
+                    Registering...
                   </>
                 ) : event &&
                   runners &&
@@ -636,9 +629,9 @@ function RegisterPageContent() {
                   event?.status !== undefined ? (
                   "Registration Closed"
                 ) : !isBalanceSufficient && event ? (
-                  "Saldo Kurang"
+                  "Insufficient Balance"
                 ) : (
-                  "Daftar Sekarang"
+                  "Register Now"
                 )}
               </Button>
             </form>

@@ -1,7 +1,7 @@
+use crate::error::ErrorCode;
+use crate::{Event, EventStatus, StakeVault};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount, Transfer};
-use crate::{Event, EventStatus, StakeVault};
-use crate::error::ErrorCode;
 
 /// Stake deposit: Event organizer transfers tokens to StakeVault as collateral
 /// This must be called before starting the event
@@ -52,38 +52,32 @@ pub struct StakeEvent<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(
-    ctx: Context<StakeEvent>,
-    event_id: String,
-    stake_amount: u64,
-) -> Result<()> {
+pub fn handler(ctx: Context<StakeEvent>, event_id: String, stake_amount: u64) -> Result<()> {
     require!(stake_amount > 0, ErrorCode::InsufficientStake);
 
     let event = &mut ctx.accounts.event;
     require!(event.stake_amount == 0, ErrorCode::StakeAlreadyDeposited);
 
-    // NEW: Calculate minimum and maximum stake
-    // Min stake = 5% of max possible pool
-    // Max stake = 200% of max possible pool
-    let expected_max_pool = event.registration_fee
+    // Stake must be exactly 50% of the maximum possible prize pool
+    // (registration_fee * max_participants * 50%) — enforced to prevent fraud
+    let expected_max_pool = event
+        .registration_fee
         .checked_mul(event.max_participants as u64)
         .ok_or(ErrorCode::ArithmeticOverflow)?;
-    
-    let min_stake = expected_max_pool
-        .checked_mul(5)
-        .and_then(|x| x.checked_div(100))
-        .ok_or(ErrorCode::ArithmeticOverflow)?;
-    
-    let max_stake = expected_max_pool
-        .checked_mul(200)
+
+    let required_stake = expected_max_pool
+        .checked_mul(50)
         .and_then(|x| x.checked_div(100))
         .ok_or(ErrorCode::ArithmeticOverflow)?;
 
-    // NEW: Enforce min/max bounds
-    require!(stake_amount >= min_stake, ErrorCode::StakeTooLow);
-    require!(stake_amount <= max_stake, ErrorCode::StakeTooHigh);
+    // Allow stake >= required (at least 50% of max pool)
+    require!(stake_amount >= required_stake, ErrorCode::StakeTooLow);
 
-    msg!("Stake validation: min={}, actual={}, max={}", min_stake, stake_amount, max_stake);
+    msg!(
+        "Stake validation: required={}, actual={}",
+        required_stake,
+        stake_amount
+    );
 
     // Transfer tokens from admin to vault (as stake)
     let cpi_accounts = Transfer {
@@ -113,7 +107,11 @@ pub fn handler(
         amount: stake_amount,
     });
 
-    msg!("Stake deposited: event={}, amount={}", event_id, stake_amount);
+    msg!(
+        "Stake deposited: event={}, amount={}",
+        event_id,
+        stake_amount
+    );
     Ok(())
 }
 

@@ -68,8 +68,16 @@ export default function CreateEventPage() {
   const [startTime, setStartTime] = useState("");
   const [durationHours, setDurationHours] = useState("2");
   const [disputeLockHours, setDisputeLockHours] = useState("24");
-  const [stakeAmountUsdc, setStakeAmountUsdc] = useState("5");
-  const PROTOCOL_FEE_BPS = 500; // 5% protocol fee
+  const PROTOCOL_FEE_BPS = 500; // 5% protocol fee → goes to developer treasury
+  // Stake collateral = 50% of total prize pool (fee × max participants)
+  // Required to prevent event creator fraud / abandoned events.
+  const STAKE_PCT = 50;
+  const computedStakeUsdc = (
+    ((parseFloat(feeUsdc) || 0) *
+      (parseInt(maxParticipants) || 0) *
+      STAKE_PCT) /
+    100
+  ).toFixed(2);
 
   // Route config – auto-updated from AdminMapBuilder
   const [checkpointsConfig, setCheckpointsConfig] = useState<any[]>([]);
@@ -166,32 +174,7 @@ export default function CreateEventPage() {
       return;
     }
 
-    const stakeAmount = parseFloat(stakeAmountUsdc);
-    if (isNaN(stakeAmount)) {
-      setError("STAKE_AMOUNT is invalid.");
-      return;
-    }
-
-    // NEW: Validate stake amount
-    const expectedMaxPool = fee * max;
-    const minStake = expectedMaxPool * 0.05;
-    const maxStake = expectedMaxPool * 2.0;
-
-    if (stakeAmount > 0) {
-      // Only validate if stake provided
-      if (stakeAmount < minStake) {
-        setError(
-          `Stake amount must be at least ${minStake.toFixed(6)} USDC (5% of max pool)`,
-        );
-        return;
-      }
-      if (stakeAmount > maxStake) {
-        setError(
-          `Stake amount cannot exceed ${maxStake.toFixed(6)} USDC (200% of max pool)`,
-        );
-        return;
-      }
-    }
+    const stakeAmount = parseFloat(computedStakeUsdc);
 
     // Build timestamps
     const startDateTime = new Date(`${startDate}T${startTime}`);
@@ -265,7 +248,7 @@ export default function CreateEventPage() {
 
       console.log("On-chain event initialized:", txSignature);
 
-      const stakeAmount = parseFloat(stakeAmountUsdc);
+      const stakeAmount = parseFloat(computedStakeUsdc);
 
       // Sync to Supabase
       const { data, error: insertError } = await supabase
@@ -318,7 +301,7 @@ export default function CreateEventPage() {
         setStakingStep(true);
         showDialog(
           "EVENT_DEPLOYED",
-          `Event "${data.name}" initialized on-chain.\n\nNext step: Deposit your stake of ${stakeAmount} USDC to activate.`,
+          `Event "${data.name}" initialized on-chain.\n\nNext step: Deposit your stake of ${computedStakeUsdc} USDC to activate.`,
           "success",
         );
       } else {
@@ -405,7 +388,7 @@ export default function CreateEventPage() {
 
       const txSig = await executeStakeEvent(
         createdEvent.eventId,
-        parseFloat(stakeAmountUsdc),
+        parseFloat(computedStakeUsdc),
         adminTokenAccount,
         vaultPubkey,
         mockUsdcMint,
@@ -421,7 +404,7 @@ export default function CreateEventPage() {
       setStakingStep(false);
       showDialog(
         "STAKE_DEPOSITED",
-        `Stake of ${stakeAmountUsdc} USDC deposited successfully.\n\nTx: ${txSig?.slice(0, 20)}...`,
+        `Stake of ${computedStakeUsdc} USDC deposited successfully.\n\nTx: ${txSig?.slice(0, 20)}...`,
         "success",
       );
     } catch (err: any) {
@@ -459,7 +442,7 @@ export default function CreateEventPage() {
                     STAKE_AMOUNT
                   </p>
                   <p className="font-data-lg text-orange-400">
-                    {stakeAmountUsdc} USDC
+                    {computedStakeUsdc} USDC
                   </p>
                   <p className="font-body-xs text-on-surface-variant">
                     This collateral is locked until event completion.
@@ -477,7 +460,7 @@ export default function CreateEventPage() {
                     </>
                   ) : (
                     <>
-                      <Coins className="h-4 w-4" /> DEPOSIT {stakeAmountUsdc}{" "}
+                      <Coins className="h-4 w-4" /> DEPOSIT {computedStakeUsdc}{" "}
                       USDC STAKE
                     </>
                   )}
@@ -752,33 +735,48 @@ export default function CreateEventPage() {
                   </div>
                 </div>
 
-                {/* Stake Amount (Phase 2.6) */}
+                {/* Stake Collateral — Fixed 50% of total prize pool */}
                 <div className="flex flex-col gap-sm">
-                  <label className="font-label-caps text-label-caps">
-                    CREATOR_STAKE_USDC
-                  </label>
-                  <div className="relative">
-                    <input
-                      className="w-full border-2 border-orange-600 bg-orange-900/10 p-md font-data-lg text-orange-400 focus:outline-none focus:border-orange-500"
-                      placeholder="5.00"
-                      step="0.01"
-                      min="0"
-                      type="number"
-                      value={stakeAmountUsdc}
-                      onChange={(e) => {
-                        setStakeAmountUsdc(e.target.value);
-                        setError(null);
-                      }}
-                      disabled={submitting}
-                    />
-                    <span className="absolute right-md top-1/2 -translate-y-1/2 font-label-caps text-label-caps text-orange-500 opacity-70">
-                      USDC
+                  <div className="flex items-center justify-between">
+                    <label className="font-label-caps text-label-caps">
+                      STAKE_COLLATERAL
+                    </label>
+                    <span className="font-label-caps text-[10px] bg-orange-600 text-background px-xs py-1">
+                      REQUIRED · 50% PRIZE POOL
                     </span>
                   </div>
-                  <p className="font-body-xs text-body-xs text-on-surface-variant">
-                    Collateral locked until event completion. Set 0 for no
-                    stake.
-                  </p>
+
+                  {/* Read-only computed display */}
+                  <div className="border-2 border-orange-600 bg-orange-900/10 p-md flex items-center justify-between">
+                    <div>
+                      <p className="font-label-caps text-[10px] text-on-surface-variant mb-xs">
+                        {STAKE_PCT}% × {feeUsdc} USDC × {maxParticipants}{" "}
+                        participants
+                      </p>
+                      <p className="font-label-caps text-label-caps text-on-surface-variant">
+                        REQUIRED_STAKE
+                      </p>
+                    </div>
+                    <span className="font-data-lg text-orange-400">
+                      {computedStakeUsdc}{" "}
+                      <span className="text-orange-600 text-sm">USDC</span>
+                    </span>
+                  </div>
+
+                  {/* Anti-scam warning */}
+                  <div className="border border-orange-600/40 bg-orange-950/20 p-sm flex items-start gap-xs">
+                    <AlertCircle className="h-3.5 w-3.5 text-orange-500 flex-shrink-0 mt-0.5" />
+                    <p className="font-body-xs text-body-xs text-on-surface-variant">
+                      Stake is locked in the smart contract until the event is
+                      settled. If the event is cancelled or abandoned, the stake
+                      is sent to the treasury as a penalty.
+                      <span className="text-orange-400 font-semibold">
+                        {" "}
+                        Creator does NOT receive registration fees — only stake
+                        is returned after a successful event.
+                      </span>
+                    </p>
+                  </div>
                 </div>
               </section>
             </div>
@@ -826,9 +824,9 @@ export default function CreateEventPage() {
               </section>
 
               {/* StakingInfoCard (Phase 2.6) */}
-              {parseFloat(stakeAmountUsdc) > 0 && (
+              {parseFloat(computedStakeUsdc) > 0 && (
                 <StakingInfoCard
-                  stakeAmount={parseFloat(stakeAmountUsdc) || 0}
+                  stakeAmount={parseFloat(computedStakeUsdc) || 0}
                   registrationFee={parseFloat(feeUsdc) || 0}
                   maxParticipants={parseInt(maxParticipants) || 2}
                   protocolFeeBps={PROTOCOL_FEE_BPS}

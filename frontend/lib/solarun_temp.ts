@@ -141,6 +141,63 @@ export type SolarunTemp = {
               }
             ]
           }
+        },
+        {
+          "name": "globalState",
+          "docs": [
+            "Global state for treasury address and fee configuration"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "Event vault token account (holds registration deposits + stake)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasuryAccount",
+          "docs": [
+            "Treasury token account (ATA of treasury_address) - receives protocol fee"
+          ],
+          "writable": true
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
       "args": [
@@ -238,7 +295,9 @@ export type SolarunTemp = {
     {
       "name": "deleteEvent",
       "docs": [
-        "Delete an event and return remaining funds"
+        "Cancel and delete a pending event, refunding participants 100%.",
+        "- `amounts`: refund amount (in token units) for each ATA in remaining_accounts.",
+        "- `is_final_batch`: when true, closes the vault and event accounts after refunding."
       ],
       "discriminator": [
         103,
@@ -258,6 +317,9 @@ export type SolarunTemp = {
         },
         {
           "name": "event",
+          "docs": [
+            "Event PDA — NOT auto-closed here; manually closed on the final batch."
+          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -281,7 +343,7 @@ export type SolarunTemp = {
         {
           "name": "vault",
           "docs": [
-            "Vault token account to be closed."
+            "Vault token account that holds registration fees + admin stake."
           ],
           "writable": true,
           "pda": {
@@ -306,7 +368,7 @@ export type SolarunTemp = {
         {
           "name": "adminTokenAccount",
           "docs": [
-            "Admin's USDC token account to receive remaining funds."
+            "Admin's USDC token account — receives the stake return on final batch."
           ],
           "writable": true
         },
@@ -319,6 +381,16 @@ export type SolarunTemp = {
         {
           "name": "eventId",
           "type": "string"
+        },
+        {
+          "name": "amounts",
+          "type": {
+            "vec": "u64"
+          }
+        },
+        {
+          "name": "isFinalBatch",
+          "type": "bool"
         }
       ]
     },
@@ -426,6 +498,66 @@ export type SolarunTemp = {
         {
           "name": "endTime",
           "type": "i64"
+        },
+        {
+          "name": "disputeLockSeconds",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "initializeGlobalState",
+      "docs": [
+        "Initialize global protocol state (treasury and fee configuration)"
+      ],
+      "discriminator": [
+        232,
+        254,
+        209,
+        244,
+        123,
+        89,
+        154,
+        207
+      ],
+      "accounts": [
+        {
+          "name": "initializer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "globalState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "treasuryAddress",
+          "type": "pubkey"
+        },
+        {
+          "name": "protocolFeeBps",
+          "type": "u16"
         }
       ]
     },
@@ -964,6 +1096,346 @@ export type SolarunTemp = {
       ]
     },
     {
+      "name": "releaseStake",
+      "docs": [
+        "Release admin's stake after dispute lock period"
+      ],
+      "discriminator": [
+        51,
+        5,
+        28,
+        250,
+        185,
+        168,
+        18,
+        53
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "eventId"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "Event vault (source of stake return)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "adminTokenAccount",
+          "docs": [
+            "Admin's token account (destination)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "eventId",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "slashAndRefund",
+      "docs": [
+        "Slash admin stake and refund participants (on event failure)"
+      ],
+      "discriminator": [
+        237,
+        95,
+        40,
+        226,
+        207,
+        100,
+        18,
+        52
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "eventId"
+              }
+            ]
+          }
+        },
+        {
+          "name": "globalState",
+          "docs": [
+            "Global state for treasury address"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "Event vault token account (holds all funds)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasuryAccount",
+          "docs": [
+            "Treasury token account (receives slashed stake as penalty)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "eventId",
+          "type": "string"
+        },
+        {
+          "name": "participantWallets",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "refundAmounts",
+          "type": {
+            "vec": "u64"
+          }
+        },
+        {
+          "name": "isFinalBatch",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "stakeEvent",
+      "docs": [
+        "Deposit stake for an event (admin stakes collateral)"
+      ],
+      "discriminator": [
+        170,
+        204,
+        19,
+        234,
+        143,
+        253,
+        203,
+        180
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "eventId"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stakeVault",
+          "docs": [
+            "Stake vault account: holds admin's stake tokens"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "adminTokenAccount",
+          "docs": [
+            "Admin's token account (ATA or custom) - source of stake"
+          ],
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "Vault token account for this event (receives stake)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "eventId",
+          "type": "string"
+        },
+        {
+          "name": "stakeAmount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "startRace",
       "docs": [
         "Start a race (transition from Initialized to Active)"
@@ -1030,6 +1502,19 @@ export type SolarunTemp = {
       ]
     },
     {
+      "name": "globalState",
+      "discriminator": [
+        163,
+        46,
+        74,
+        168,
+        216,
+        123,
+        133,
+        98
+      ]
+    },
+    {
       "name": "participant",
       "discriminator": [
         32,
@@ -1040,6 +1525,19 @@ export type SolarunTemp = {
         179,
         54,
         6
+      ]
+    },
+    {
+      "name": "stakeVault",
+      "discriminator": [
+        192,
+        112,
+        65,
+        125,
+        129,
+        151,
+        173,
+        226
       ]
     }
   ],
@@ -1084,6 +1582,19 @@ export type SolarunTemp = {
       ]
     },
     {
+      "name": "globalStateInitialized",
+      "discriminator": [
+        246,
+        51,
+        83,
+        38,
+        11,
+        74,
+        6,
+        139
+      ]
+    },
+    {
       "name": "participantRegistered",
       "discriminator": [
         47,
@@ -1097,6 +1608,19 @@ export type SolarunTemp = {
       ]
     },
     {
+      "name": "raceCompleted",
+      "discriminator": [
+        189,
+        51,
+        1,
+        200,
+        158,
+        160,
+        169,
+        162
+      ]
+    },
+    {
       "name": "refundsProcessed",
       "discriminator": [
         29,
@@ -1107,6 +1631,45 @@ export type SolarunTemp = {
         85,
         99,
         6
+      ]
+    },
+    {
+      "name": "slashAndRefundProcessed",
+      "discriminator": [
+        146,
+        76,
+        25,
+        54,
+        198,
+        20,
+        169,
+        184
+      ]
+    },
+    {
+      "name": "stakeDeposited",
+      "discriminator": [
+        69,
+        152,
+        144,
+        109,
+        232,
+        34,
+        225,
+        19
+      ]
+    },
+    {
+      "name": "stakeReleased",
+      "discriminator": [
+        7,
+        221,
+        192,
+        32,
+        123,
+        29,
+        96,
+        45
       ]
     }
   ],
@@ -1153,113 +1716,198 @@ export type SolarunTemp = {
     },
     {
       "code": 6008,
+      "name": "creatorCannotRegister",
+      "msg": "E0015: Event creator cannot register as a participant in their own event"
+    },
+    {
+      "code": 6009,
       "name": "invalidChipUid",
       "msg": "E0014: Invalid chip UID (empty or too long, max 20 chars)"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "maxParticipantsReached",
       "msg": "Maximum participants reached"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "finishEventNotFound",
       "msg": "E0020: Event not found for finish recording"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "finishEventNotActive",
       "msg": "E0021: Event is not in Active status"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "participantNotFound",
       "msg": "E0022: Participant not found for this event"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "invalidCheckpointId",
       "msg": "E0023: Invalid checkpoint ID (must be 0, 1, or 2)"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "participantAlreadyFinished",
       "msg": "E0024: Participant has already finished, cannot record duplicate finish"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "refundEventNotFound",
       "msg": "E0030: Event not found for refund processing"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "eventNotCompleted",
       "msg": "E0031: Event must be Completed before processing refunds"
     },
     {
-      "code": 6017,
+      "code": 6018,
       "name": "vaultEmpty",
       "msg": "E0032: Vault is empty, cannot process refunds"
     },
     {
-      "code": 6018,
+      "code": 6019,
       "name": "invalidFinisherPosition",
       "msg": "E0033: Invalid finisher position"
     },
     {
-      "code": 6019,
+      "code": 6020,
       "name": "transferFailed",
       "msg": "E0034: Transfer to participant failed"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "arithmeticOverflow",
       "msg": "E0035: Arithmetic overflow in prize calculation"
     },
     {
-      "code": 6021,
+      "code": 6022,
       "name": "invalidWalletAddress",
       "msg": "E0036: Invalid wallet address (zero address)"
     },
     {
-      "code": 6022,
+      "code": 6023,
       "name": "unauthorizedAdmin",
       "msg": "E0040: Unauthorized signer (not admin)"
     },
     {
-      "code": 6023,
+      "code": 6024,
       "name": "unauthorizedBackend",
       "msg": "E0041: Unauthorized signer (not backend)"
     },
     {
-      "code": 6024,
+      "code": 6025,
       "name": "invalidFullName",
       "msg": "E0050: Invalid full name (empty or too long, max 50 chars)"
     },
     {
-      "code": 6025,
+      "code": 6026,
       "name": "invalidRunnerId",
       "msg": "E0051: Invalid runner ID (empty or too long, max 36 chars)"
     },
     {
-      "code": 6026,
+      "code": 6027,
       "name": "invalidWalletFormat",
       "msg": "E0052: Invalid wallet address format"
     },
     {
-      "code": 6027,
+      "code": 6028,
       "name": "eventNotInitialized",
       "msg": "Event must be in Initialized status to register"
     },
     {
-      "code": 6028,
+      "code": 6029,
       "name": "eventNotActiveForFinish",
       "msg": "Event must be in Active status to record finish"
     },
     {
-      "code": 6029,
+      "code": 6030,
       "name": "eventNotCompletedForRefund",
       "msg": "Event must be in Completed status to process refunds"
+    },
+    {
+      "code": 6031,
+      "name": "insufficientStake",
+      "msg": "E0060: Insufficient stake amount"
+    },
+    {
+      "code": 6032,
+      "name": "stakeAlreadyDeposited",
+      "msg": "E0061: Stake already deposited for this event"
+    },
+    {
+      "code": 6033,
+      "name": "globalStateNotFound",
+      "msg": "E0062: Global state account not found"
+    },
+    {
+      "code": 6034,
+      "name": "treasuryAddressNotSet",
+      "msg": "E0063: Treasury address not set"
+    },
+    {
+      "code": 6035,
+      "name": "eventAlreadyCompleted",
+      "msg": "E0064: Event already completed, cannot process again"
+    },
+    {
+      "code": 6036,
+      "name": "insufficientVaultFunds",
+      "msg": "E0065: Insufficient funds in vault for fee distribution"
+    },
+    {
+      "code": 6037,
+      "name": "stakeVaultError",
+      "msg": "E0066: Stake vault error"
+    },
+    {
+      "code": 6038,
+      "name": "cannotRefundEventNotCompleted",
+      "msg": "E0067: Cannot refund - event must be in Completed status"
+    },
+    {
+      "code": 6039,
+      "name": "refundAlreadyProcessed",
+      "msg": "E0068: Refund already processed"
+    },
+    {
+      "code": 6040,
+      "name": "stakeTooLow",
+      "msg": "Stake amount is below minimum required"
+    },
+    {
+      "code": 6041,
+      "name": "stakeTooHigh",
+      "msg": "Stake amount exceeds maximum allowed"
+    },
+    {
+      "code": 6042,
+      "name": "invalidProtocolFee",
+      "msg": "Protocol fee cannot exceed 10000 bps (100%)"
+    },
+    {
+      "code": 6043,
+      "name": "stakeLocked",
+      "msg": "Stake is locked during dispute period"
+    },
+    {
+      "code": 6044,
+      "name": "noStakeToRelease",
+      "msg": "No stake to release"
+    },
+    {
+      "code": 6045,
+      "name": "eventMustBePending",
+      "msg": "E0070: Event must be in Initialized (Pending) status to delete"
+    },
+    {
+      "code": 6046,
+      "name": "insufficientVaultForRefunds",
+      "msg": "E0071: Vault has insufficient funds to cover all participant refunds"
     }
   ],
   "types": [
@@ -1279,6 +1927,10 @@ export type SolarunTemp = {
           {
             "name": "checkpointId",
             "type": "u8"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }
@@ -1294,6 +1946,10 @@ export type SolarunTemp = {
           },
           {
             "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "stakeVault",
             "type": "pubkey"
           },
           {
@@ -1329,6 +1985,14 @@ export type SolarunTemp = {
             "type": "u64"
           },
           {
+            "name": "stakeAmount",
+            "type": "u64"
+          },
+          {
+            "name": "isCompleted",
+            "type": "bool"
+          },
+          {
             "name": "startTime",
             "type": "i64"
           },
@@ -1337,11 +2001,23 @@ export type SolarunTemp = {
             "type": "i64"
           },
           {
+            "name": "disputeLockUntil",
+            "type": "i64"
+          },
+          {
+            "name": "disputeLockSeconds",
+            "type": "i64"
+          },
+          {
             "name": "bump",
             "type": "u8"
           },
           {
             "name": "vaultBump",
+            "type": "u8"
+          },
+          {
+            "name": "stakeVaultBump",
             "type": "u8"
           }
         ]
@@ -1361,8 +2037,16 @@ export type SolarunTemp = {
             "type": "pubkey"
           },
           {
-            "name": "remainingReturned",
+            "name": "participantsRefunded",
+            "type": "u32"
+          },
+          {
+            "name": "stakeReturned",
             "type": "u64"
+          },
+          {
+            "name": "isFinal",
+            "type": "bool"
           }
         ]
       }
@@ -1398,6 +2082,10 @@ export type SolarunTemp = {
           },
           {
             "name": "endTime",
+            "type": "i64"
+          },
+          {
+            "name": "disputeLockSeconds",
             "type": "i64"
           }
         ]
@@ -1440,6 +2128,42 @@ export type SolarunTemp = {
       }
     },
     {
+      "name": "globalState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "treasuryAddress",
+            "type": "pubkey"
+          },
+          {
+            "name": "protocolFeeBps",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "globalStateInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "treasuryAddress",
+            "type": "pubkey"
+          },
+          {
+            "name": "protocolFeeBps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
       "name": "participant",
       "type": {
         "kind": "struct",
@@ -1473,6 +2197,14 @@ export type SolarunTemp = {
                 "name": "participantStatus"
               }
             }
+          },
+          {
+            "name": "lastCheckpoint",
+            "type": "u8"
+          },
+          {
+            "name": "lastCheckpointAt",
+            "type": "i64"
           },
           {
             "name": "registeredAt",
@@ -1539,6 +2271,34 @@ export type SolarunTemp = {
       }
     },
     {
+      "name": "raceCompleted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "eventId",
+            "type": "string"
+          },
+          {
+            "name": "vaultBalance",
+            "type": "u64"
+          },
+          {
+            "name": "feeAmount",
+            "type": "u64"
+          },
+          {
+            "name": "prizePoolRemaining",
+            "type": "u64"
+          },
+          {
+            "name": "disputeLockUntil",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "refundsProcessed",
       "type": {
         "kind": "struct",
@@ -1558,6 +2318,106 @@ export type SolarunTemp = {
           {
             "name": "nonFinisherCount",
             "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "slashAndRefundProcessed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "eventId",
+            "type": "string"
+          },
+          {
+            "name": "slashAmount",
+            "type": "u64"
+          },
+          {
+            "name": "totalRefunded",
+            "type": "u64"
+          },
+          {
+            "name": "participantsRefunded",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "stakeDeposited",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "eventId",
+            "type": "string"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "stakeReleased",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "eventId",
+            "type": "string"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "releasedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "stakeVault",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "isSlashed",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }

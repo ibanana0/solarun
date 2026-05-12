@@ -272,7 +272,7 @@ async function run(eventId: string) {
     try {
       console.log(`⏳ Submitting on-chain registration...`);
       regTx = await (runnerProgram.methods as any)
-        .register_participant(
+        .registerParticipant(
           cleanEventId,
           chipUid,
           runnerKeypair.publicKey,

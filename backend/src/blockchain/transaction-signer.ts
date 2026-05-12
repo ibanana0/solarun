@@ -273,7 +273,7 @@ export async function buildProcessRefundsInstructions(
 
     // 6. Gunakan MethodsBuilder dengan 6 argumen sesuai IDL yang sudah diupdate
     const mainInstruction = await (program.methods as any)
-      .process_refunds(
+      .processRefunds(
         cleanEventId,
         [], // finishers: Vec<FinisherData>
         nonFinishers, // non_finishers: Vec<string>
@@ -406,12 +406,15 @@ export async function checkConnection(): Promise<boolean> {
 // ============================================================================
 
 /**
- * Build instruction for delete_event
+ * Build instruction(s) for delete_event (cancel a PENDING event).
  *
- * This instruction:
- * - Transfers remaining USDC from vault to admin's token account
- * - Closes the vault token account (rent → admin)
- * - Closes the event PDA (rent → admin, via `close = admin`)
+ * Behaviour (mirrors the updated smart contract):
+ * - ONLY works when event status is Initialized (Pending).
+ * - Refunds each participant 100% of their registration fee via remaining_accounts.
+ * - On the final batch, returns the admin stake and closes vault + event accounts.
+ *
+ * For events with many participants, call this multiple times with batches of
+ * ~20 participants per transaction. Set `isFinalBatch = true` on the last call.
  */
 export interface DeleteEventParams {
   eventId: string;
@@ -419,13 +422,27 @@ export interface DeleteEventParams {
   vaultAddress: string;
   adminWallet: PublicKey;
   adminTokenAccount: PublicKey;
+  /** ATA addresses of participants to refund in this batch */
+  participantAtas?: PublicKey[];
+  /** Refund amount (token units) for each participant in participantAtas */
+  refundAmounts?: anchor.BN[];
+  /** True when this is the last batch — closes accounts after refunding */
+  isFinalBatch?: boolean;
 }
 
 export async function buildDeleteEventInstruction(
   params: DeleteEventParams,
 ): Promise<anchor.web3.TransactionInstruction> {
-  const { eventId, vaultAddress, adminWallet, programId, adminTokenAccount } =
-    params;
+  const {
+    eventId,
+    vaultAddress,
+    adminWallet,
+    programId,
+    adminTokenAccount,
+    participantAtas = [],
+    refundAmounts = [],
+    isFinalBatch = true,
+  } = params;
 
   const cleanEventId = eventId.replace(/-/g, "");
 
@@ -433,7 +450,8 @@ export async function buildDeleteEventInstruction(
     console.log(`\n📋 Building deleteEvent instruction...`);
     console.log(`   Event ID: ${cleanEventId}`);
     console.log(`   Admin: ${adminWallet.toBase58()}`);
-    console.log(`   Admin Token Account: ${adminTokenAccount.toBase58()}`);
+    console.log(`   Participants to refund: ${participantAtas.length}`);
+    console.log(`   isFinalBatch: ${isFinalBatch}`);
 
     const provider = new anchor.AnchorProvider(
       getConnection(),
@@ -452,15 +470,26 @@ export async function buildDeleteEventInstruction(
     );
     console.log(`   Event PDA: ${eventPda.toBase58()}`);
 
+    // Convert BN amounts to the u64 array expected by the contract
+    const amountsU64 = refundAmounts.map((a) => a);
+
+    // remaining_accounts: one writable ATA per participant to refund
+    const remainingAccounts = participantAtas.map((ata) => ({
+      pubkey: ata,
+      isSigner: false,
+      isWritable: true,
+    }));
+
     const instruction = await (program.methods as any)
-      .deleteEvent(cleanEventId)
+      .deleteEvent(cleanEventId, amountsU64, isFinalBatch)
       .accounts({
         admin: adminWallet,
         event: eventPda,
         vault: new PublicKey(vaultAddress),
-        adminTokenAccount: adminTokenAccount,
+        adminTokenAccount,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
+      .remainingAccounts(remainingAccounts)
       .instruction();
 
     console.log(`✅ deleteEvent instruction built successfully`);
@@ -593,7 +622,7 @@ export async function recordFinishOnChain(
 
   // Build the transaction instruction manually for retry control
   const instruction = await (program.methods as any)
-    .record_finish(
+    .recordFinish(
       cleanEventId,
       chipUid,
       checkpointId,

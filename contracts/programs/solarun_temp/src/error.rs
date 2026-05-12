@@ -131,16 +131,23 @@ pub enum ErrorCode {
 
     #[msg("Stake amount is below minimum required")]
     StakeTooLow,
-    
+
     #[msg("Stake amount exceeds maximum allowed")]
     StakeTooHigh,
-    
+
     #[msg("Protocol fee cannot exceed 10000 bps (100%)")]
     InvalidProtocolFee,
 
     #[msg("Stake is locked during dispute period")]
     StakeLocked,
-    
+
     #[msg("No stake to release")]
     NoStakeToRelease,
+
+    // E0070-E0079: Event Lifecycle Violations
+    #[msg("E0070: Event must be in Initialized (Pending) status to delete")]
+    EventMustBePending,
+
+    #[msg("E0071: Vault has insufficient funds to cover all participant refunds")]
+    InsufficientVaultForRefunds,
 }

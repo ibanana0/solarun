@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   Loader2,
@@ -20,6 +20,7 @@ import { useEvent } from "@/hooks/useEvent";
 import { useRunners } from "@/hooks/useRunners";
 import { useAuth } from "@/hooks/useAuth";
 import { useProgram } from "@/hooks/useProgram";
+import { useStakingAndFees } from "@/hooks/useStakingAndFees";
 import { supabase } from "@/lib/supabase";
 import { PublicKey } from "@solana/web3.js";
 import { LeaderboardTable } from "@/components/LeaderboardTable";
@@ -28,7 +29,7 @@ const RouteViewer = dynamic(() => import("@/components/RouteViewer"), {
   ssr: false,
   loading: () => (
     <div className="h-[500px] w-full animate-pulse bg-muted flex items-center justify-center border-2 border-primary">
-      <p className="font-mono text-muted-foreground">Memuat Peta...</p>
+      <p className="font-mono text-muted-foreground">Loading Map...</p>
     </div>
   ),
 });
@@ -45,7 +46,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleString("id-ID", {
+  return new Date(dateStr).toLocaleString("en-US", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -103,10 +104,13 @@ export default function EventPage({
   const { data: runners, isLoading: runnersLoading } = useRunners(id);
   const { walletAddress } = useAuth();
   const program = useProgram();
+  const { executeStakeEvent } = useStakingAndFees(program);
 
   const [isStarting, setIsStarting] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+
+  const [isDepositing, setIsDepositing] = useState(false);
 
   // Dialog state
   const [dialog, setDialog] = useState<{
@@ -145,11 +149,152 @@ export default function EventPage({
 
   const isCreator = walletAddress === event?.creator_wallet;
 
-  const handleStartRace = async () => {
-    if (!program || !event) return;
+  const handleDeposit = useCallback(() => {
+    if (!event || !program || !walletAddress) return;
+
+    const stakeAmount = event.stake_amount || 0;
+
+    // Step 1: tampilkan dialog konfirmasi
     showDialog(
-      "Konfirmasi Start Race",
-      "Apakah Anda yakin ingin memulai perlombaan ini? Sensor RFID akan mulai menerima tap.",
+      "Confirm Security Deposit",
+      `You are about to deposit ${stakeAmount} USDC as a security deposit for this event.\n\nFunds will be locked in the smart contract until the event is completed.\n\nContinue?`,
+      "warning",
+      () => {
+        // Step 2: tutup dialog konfirmasi secara eksplisit SEBELUM async dimulai.
+        // Ini mencegah race condition di mana Radix menutup dialog via onOpenChange(false)
+        // setelah async selesai, sehingga dialog error/success tidak bisa muncul.
+        setDialog((prev) => ({ ...prev, open: false }));
+
+        // Step 3: jalankan transaksi secara async
+        const runDeposit = async () => {
+          setIsDepositing(true);
+          try {
+            const eventId = event.id.replace(/-/g, "");
+
+            const [eventPda] = PublicKey.findProgramAddressSync(
+              [Buffer.from("event"), Buffer.from(eventId)],
+              program.programId,
+            );
+
+            const [mockUsdcMint] = PublicKey.findProgramAddressSync(
+              [Buffer.from("mock_usdc_mint")],
+              program.programId,
+            );
+
+            const { getAssociatedTokenAddress } =
+              await import("@solana/spl-token");
+            const adminTokenAccount = await getAssociatedTokenAddress(
+              mockUsdcMint,
+              new PublicKey(walletAddress),
+            );
+
+            const [vaultPda] = PublicKey.findProgramAddressSync(
+              [Buffer.from("vault"), eventPda.toBuffer()],
+              program.programId,
+            );
+
+            const txSig = await executeStakeEvent(
+              eventId,
+              stakeAmount,
+              adminTokenAccount,
+              vaultPda,
+              mockUsdcMint,
+            );
+
+            await supabase
+              .from("race_events")
+              .update({ stake_status: "staked" })
+              .eq("id", event.id);
+
+            // Step 4a: sukses — tampilkan dialog hasil
+            showDialog(
+              "Deposit Successful! ✅",
+              `${stakeAmount} USDC successfully deposited as security.\nYou can now start the event.\n\nTX: ${txSig.slice(0, 20)}...`,
+              "success",
+            );
+
+            await refetchEvent();
+          } catch (error: any) {
+            console.error("Deposit failed:", error);
+            const raw = error.message || String(error);
+
+            // Step 4b: gagal — kategorikan error lalu tampilkan dialog
+            let errorMsg: string;
+
+            if (
+              raw.includes("0x1") ||
+              raw.includes("insufficient") ||
+              raw.includes("Insufficient")
+            ) {
+              errorMsg =
+                `INSUFFICIENT USDC BALANCE\n\n` +
+                `Required : ${stakeAmount} USDC\n` +
+                `Solution : Use the FAUCET button on this page to get\n` +
+                `           free Mock USDC, then try again.`;
+            } else if (
+              raw.includes("User rejected") ||
+              raw.includes("rejected by user")
+            ) {
+              errorMsg = "Transaction cancelled by user.";
+            } else if (
+              raw.includes("Blockhash not found") ||
+              raw.includes("block height exceeded")
+            ) {
+              errorMsg =
+                "Solana network is congested.\nPlease wait a few seconds and try again.";
+            } else {
+              errorMsg = `Transaction failed:\n${raw}`;
+            }
+
+            showDialog("Deposit Failed ❌", errorMsg, "error");
+          } finally {
+            setIsDepositing(false);
+          }
+        };
+
+        // Tunda sedikit agar animasi tutup dialog konfirmasi selesai
+        // sebelum dialog baru dibuka, sehingga tidak terjadi konflik state Radix.
+        setTimeout(runDeposit, 150);
+      },
+      "Yes, Deposit Now",
+      "Cancel",
+    );
+  }, [event, program, walletAddress, executeStakeEvent, refetchEvent]);
+
+  const handleStartRace = useCallback(async () => {
+    if (!program || !event) return;
+
+    // Validate deposit status first
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const response = await fetch(
+        `${apiUrl}/api/events/${event.id}/validate-start`,
+        { method: "POST" },
+      );
+      const result = await response.json();
+
+      if (!result.can_start) {
+        showDialog(
+          "Cannot Start Race",
+          result.message ||
+            "Event cannot be started yet. Please complete the deposit first.",
+          "warning",
+        );
+        return;
+      }
+    } catch (error) {
+      console.error("Validation failed:", error);
+      showDialog(
+        "Error",
+        "Failed to validate event status. Please try again.",
+        "error",
+      );
+      return;
+    }
+
+    showDialog(
+      "Confirm Start Race",
+      "Are you sure you want to start this race? RFID sensors will begin accepting taps.",
       "warning",
       async () => {
         setIsStarting(true);
@@ -169,9 +314,14 @@ export default function EventPage({
           console.log("Race started on-chain:", txSignature);
           await supabase
             .from("race_events")
-            .update({ status: "active", start_tx_signature: txSignature })
+            .update({
+              status: "active",
+              start_tx_signature: txSignature,
+              // Set actual start_time to NOW (not the originally scheduled time)
+              start_time: new Date().toISOString(),
+            })
             .eq("id", event.id);
-          showDialog("Berhasil!", `Race berhasil dimulai!`, "success");
+          showDialog("Success!", `Race started successfully!`, "success");
           refetchEvent();
         } catch (error: any) {
           console.error("Failed to start race:", error);
@@ -183,7 +333,10 @@ export default function EventPage({
                 [Buffer.from("event"), Buffer.from(cleanEventId)],
                 program.programId,
               );
-              const onChainData = await program.account.event.fetch(eventPda);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const onChainData = await (program.account as any).event.fetch(
+                eventPda,
+              );
               if (
                 onChainData.status.active ||
                 onChainData.status.completed ||
@@ -191,11 +344,15 @@ export default function EventPage({
               ) {
                 await supabase
                   .from("race_events")
-                  .update({ status: "active" })
+                  .update({
+                    status: "active",
+                    // Set actual start_time to NOW (recovered from timeout)
+                    start_time: new Date().toISOString(),
+                  })
                   .eq("id", event.id);
                 showDialog(
-                  "Berhasil!",
-                  "Race berhasil dimulai (Berhasil di-recover dari timeout jaringan)!",
+                  "Success!",
+                  "Race started successfully (recovered from network timeout)!",
                   "success",
                 );
                 refetchEvent();
@@ -207,23 +364,23 @@ export default function EventPage({
           }
           if (msg.includes("Custom: 2006")) {
             msg =
-              "Data event tidak kompatibel (Error 2006). Kemungkinan event ini dibuat dengan versi contract lama. Silakan buat event baru.";
+              "Event data incompatible (Error 2006). This event may have been created with an older contract version. Please create a new event.";
           }
-          showDialog("Gagal", `Gagal memulai race: ${msg}`, "error");
+          showDialog("Failed", `Failed to start race: ${msg}`, "error");
         } finally {
           setIsStarting(false);
         }
       },
-      "Ya, Mulai Race",
-      "Batal",
+      "Yes, Start Race",
+      "Cancel",
     );
-  };
+  }, [program, event, refetchEvent]);
 
-  const handleFinalize = async () => {
+  const handleFinalize = useCallback(async () => {
     if (!program || !event) return;
     showDialog(
-      "Konfirmasi Finalisasi",
-      "Apakah Anda yakin ingin memfinalisasi event? Ini akan memicu pembagian hadiah otomatis.",
+      "Confirm Finalization",
+      "Are you sure you want to finalize the event? This will trigger automatic prize distribution.",
       "warning",
       async () => {
         setIsFinalizing(true);
@@ -233,11 +390,41 @@ export default function EventPage({
             [Buffer.from("event"), Buffer.from(cleanEventId)],
             program.programId,
           );
+          
+          const [globalStatePda] = PublicKey.findProgramAddressSync(
+            [Buffer.from("global")],
+            program.programId,
+          );
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const globalState = await (program.account as any).globalState.fetch(globalStatePda);
+          const treasuryAddress = globalState.treasuryAddress;
+
+          const [mockUsdcMint] = PublicKey.findProgramAddressSync(
+            [Buffer.from("mock_usdc_mint")],
+            program.programId,
+          );
+
+          const { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } = await import("@solana/spl-token");
+          const treasuryAccount = await getAssociatedTokenAddress(
+            mockUsdcMint,
+            treasuryAddress,
+            true
+          );
+
+          const [vaultPda] = PublicKey.findProgramAddressSync(
+            [Buffer.from("vault"), eventPda.toBuffer()],
+            program.programId,
+          );
+
           const txSignature = await program.methods
             .completeRace(cleanEventId)
             .accounts({
               admin: program.provider.publicKey,
               event: eventPda,
+              globalState: globalStatePda,
+              vault: vaultPda,
+              treasuryAccount: treasuryAccount,
+              tokenProgram: TOKEN_PROGRAM_ID,
             } as any)
             .rpc();
           console.log("Race completed on-chain:", txSignature);
@@ -251,8 +438,8 @@ export default function EventPage({
             .eq("event_id", event.id)
             .neq("status", "finished");
           showDialog(
-            "Berhasil!",
-            `Event berhasil difinalisasi!\nPeserta yang belum finish telah dinyatakan DNF.\nSistem akan mulai membagikan hadiah.\n\nTX: ${txSignature}`,
+            "Success!",
+            `Event finalized successfully!\nParticipants who did not finish have been marked as DNF.\nThe system will begin distributing prizes.\n\nTX: ${txSignature}`,
             "success",
           );
           refetchEvent();
@@ -266,7 +453,10 @@ export default function EventPage({
                 [Buffer.from("event"), Buffer.from(cleanEventId)],
                 program.programId,
               );
-              const onChainData = await program.account.event.fetch(eventPda);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const onChainData = await (program.account as any).event.fetch(
+                eventPda,
+              );
               if (onChainData.status.completed || onChainData.status.settled) {
                 await supabase
                   .from("race_events")
@@ -278,8 +468,8 @@ export default function EventPage({
                   .eq("event_id", event.id)
                   .neq("status", "finished");
                 showDialog(
-                  "Berhasil!",
-                  "Event berhasil difinalisasi (Berhasil di-recover dari timeout jaringan)!",
+                  "Success!",
+                  "Event finalized successfully (recovered from network timeout)!",
                   "success",
                 );
                 refetchEvent();
@@ -291,17 +481,17 @@ export default function EventPage({
           }
           if (msg.includes("Custom: 2006")) {
             msg =
-              "Data event tidak kompatibel (Error 2006). Kemungkinan event ini dibuat dengan versi contract lama. Silakan buat event baru.";
+              "Event data incompatible (Error 2006). This event may have been created with an older contract version. Please create a new event.";
           }
-          showDialog("Gagal", `Gagal finalisasi race: ${msg}`, "error");
+          showDialog("Failed", `Failed to finalize race: ${msg}`, "error");
         } finally {
           setIsFinalizing(false);
         }
       },
-      "Ya, Finalisasi",
-      "Batal",
+      "Yes, Finalize",
+      "Cancel",
     );
-  };
+  }, [program, event, refetchEvent]);
 
   const totalRunners = runners?.length ?? 0;
   const finishedCount =
@@ -482,6 +672,48 @@ export default function EventPage({
                 </span>
               </div>
             )}
+
+            {/* Deposit Banner */}
+            {isCreator &&
+              event.status === "pending" &&
+              (event.stake_amount ?? 0) > 0 &&
+              event.stake_status !== "staked" && (
+                <div className="w-full md:w-64 border-2 border-orange-500 bg-orange-500/10 p-sm">
+                  <div className="flex items-start gap-xs mb-xs">
+                    <AlertCircle className="h-4 w-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-label-caps text-label-caps text-orange-500 mb-xs">
+                        DEPOSIT REQUIRED
+                      </p>
+                      <p className="font-body-xs text-on-surface-variant text-[11px] mb-sm">
+                        You must deposit {event.stake_amount} USDC before
+                        starting the race.
+                        {event.deposit_deadline && (
+                          <>
+                            <br />
+                            Deadline: {formatDate(event.deposit_deadline)}
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={handleDeposit}
+                    disabled={isDepositing}
+                    className="w-full py-sm font-label-caps text-[11px] bg-orange-500 text-background hover:bg-orange-600 border-0 transition-none active:translate-y-1 h-auto rounded-none"
+                  >
+                    {isDepositing ? (
+                      <>
+                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                        PROCESSING...
+                      </>
+                    ) : (
+                      `DEPOSIT ${event.stake_amount} USDC NOW`
+                    )}
+                  </Button>
+                </div>
+              )}
+
             {/* Creator Actions */}
             {isCreator && event.status === "pending" && (
               <Button
@@ -549,6 +781,7 @@ export default function EventPage({
             <LeaderboardTable
               runners={runners ?? []}
               isLoading={runnersLoading}
+              event={event ?? null}
             />
             {isEventOpen && !isCreator && (
               <Button

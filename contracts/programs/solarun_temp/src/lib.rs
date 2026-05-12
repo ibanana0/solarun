@@ -53,22 +53,24 @@ pub mod solarun_temp {
         end_time: i64,
         dispute_lock_seconds: i64,
     ) -> Result<()> {
-        initialize::handler(ctx, event_id, max_participants, registration_fee, start_time, end_time, dispute_lock_seconds)
+        initialize::handler(
+            ctx,
+            event_id,
+            max_participants,
+            registration_fee,
+            start_time,
+            end_time,
+            dispute_lock_seconds,
+        )
     }
 
     /// Start a race (transition from Initialized to Active)
-    pub fn start_race(
-        ctx: Context<StartRace>,
-        event_id: String,
-    ) -> Result<()> {
+    pub fn start_race(ctx: Context<StartRace>, event_id: String) -> Result<()> {
         start_race::handler(ctx, event_id)
     }
 
     /// Complete a race (transition from Active to Completed)
-    pub fn complete_race(
-        ctx: Context<CompleteRace>,
-        event_id: String,
-    ) -> Result<()> {
+    pub fn complete_race(ctx: Context<CompleteRace>, event_id: String) -> Result<()> {
         complete_race::handler(ctx, event_id)
     }
 
@@ -81,7 +83,14 @@ pub mod solarun_temp {
         full_name: String,
         runner_id: String,
     ) -> Result<()> {
-        register_participant::handler(ctx, event_id, chip_uid, wallet_address, full_name, runner_id)
+        register_participant::handler(
+            ctx,
+            event_id,
+            chip_uid,
+            wallet_address,
+            full_name,
+            runner_id,
+        )
     }
 
     /// Record checkpoint completion for a participant
@@ -93,7 +102,14 @@ pub mod solarun_temp {
         finish_position: u8,
         timestamp: i64,
     ) -> Result<()> {
-        record_finish::handler(ctx, event_id, chip_uid, checkpoint_id, finish_position, timestamp)
+        record_finish::handler(
+            ctx,
+            event_id,
+            chip_uid,
+            checkpoint_id,
+            finish_position,
+            timestamp,
+        )
     }
 
     /// Process refunds and prize distribution (USDC) for completed event
@@ -106,15 +122,27 @@ pub mod solarun_temp {
         amounts: Vec<u64>,
         is_final_batch: bool,
     ) -> Result<()> {
-        process_refunds::handler(ctx, event_id, finishers, non_finishers, recipient_wallets, amounts, is_final_batch)
+        process_refunds::handler(
+            ctx,
+            event_id,
+            finishers,
+            non_finishers,
+            recipient_wallets,
+            amounts,
+            is_final_batch,
+        )
     }
 
-    /// Delete an event and return remaining funds
-    pub fn delete_event(
-        ctx: Context<DeleteEvent>,
+    /// Cancel and delete a pending event, refunding participants 100%.
+    /// - `amounts`: refund amount (in token units) for each ATA in remaining_accounts.
+    /// - `is_final_batch`: when true, closes the vault and event accounts after refunding.
+    pub fn delete_event<'info>(
+        ctx: Context<'info, DeleteEvent<'info>>,
         event_id: String,
+        amounts: Vec<u64>,
+        is_final_batch: bool,
     ) -> Result<()> {
-        delete_event::handler(ctx, event_id)
+        delete_event::handler(ctx, event_id, amounts, is_final_batch)
     }
 
     /// Close a participant PDA to reclaim rent
@@ -134,14 +162,17 @@ pub mod solarun_temp {
         refund_amounts: Vec<u64>,
         is_final_batch: bool,
     ) -> Result<()> {
-        slash_and_refund::handler(ctx, event_id, participant_wallets, refund_amounts, is_final_batch)
+        slash_and_refund::handler(
+            ctx,
+            event_id,
+            participant_wallets,
+            refund_amounts,
+            is_final_batch,
+        )
     }
 
     /// Release admin's stake after dispute lock period
-    pub fn release_stake(
-        ctx: Context<ReleaseStake>,
-        event_id: String,
-    ) -> Result<()> {
+    pub fn release_stake(ctx: Context<ReleaseStake>, event_id: String) -> Result<()> {
         release_stake::handler(ctx, event_id)
     }
 }
