@@ -73,11 +73,16 @@ To test the system without physical hardware, we provide a simulation script:
 
 1. **Setup:** Start the backend and frontend. Ensure Supabase is configured.
 2. **Create Event:** Use the UI to create a new event with 3 checkpoints (0, 1, 2).
-3. **Register Runners:** Register 5-10 runners (you can use the `backend/src/scripts/spawn-dummy-users.ts` script).
+3. **Register Runners:** Register 5-10 runners (you can use the `backend/src/scripts/auto-register.ts` script).
 4. **Simulate Race:** Run the simulation script:
    ```bash
    cd backend
    npx tsx src/simulate-full-race.ts
+   ```
+   or
+   ```bash
+   cd backend
+   npx tsx src/scripts/interactive-mqtt-client.ts
    ```
    This script will publish MQTT messages as if RFID sensors were being tapped.
 5. **Verify On-Chain:** Watch the event status change to `Completed` on the dashboard, and check the prize distribution transactions on Solscan (Devnet).

@@ -73,9 +73,9 @@ export default function HomePage() {
                     <div className="flex flex-col md:flex-row gap-gutter justify-center">
                         <Button
                             asChild
-                            className="bg-primary text-background border-2 border-primary px-xl py-lg font-label-caps text-label-caps hover:bg-transparent hover:text-primary transition-none active:translate-y-1 h-auto rounded-none"
+                            className="text-black border-2 border-primary px-xl py-lg font-label-caps text-label-caps hover:bg-transparent hover:text-primary transition-none active:translate-y-1 h-auto rounded-none"
                         >
-                            <Link href="/register">ENTER RACE</Link>
+                            <Link href="/register" className='text-black'>ENTER RACE</Link>
                         </Button>
                         <Button
                             asChild
