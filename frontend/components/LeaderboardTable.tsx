@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Trophy, Clock, ChevronRight, ExternalLink } from "lucide-react";
 import type { RunnerWithLogs } from "@/hooks/useRunners";
@@ -133,19 +134,20 @@ export function LeaderboardTable({
   return (
     <>
       <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-16">#</TableHead>
-              <TableHead>Participant Name</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Checkpoint</TableHead>
-              <TableHead>Time (Real)</TableHead>
-              <TableHead>Wallet</TableHead>
-              <TableHead className="text-right">Prize</TableHead>
-              <TableHead className="text-right">On-Chain Tx</TableHead>
-            </TableRow>
-          </TableHeader>
+        <ScrollArea className="h-[600px]">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-16">#</TableHead>
+                <TableHead>Participant Name</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Checkpoint</TableHead>
+                <TableHead>Time (Real)</TableHead>
+                <TableHead>Wallet</TableHead>
+                <TableHead className="text-right">Prize</TableHead>
+                <TableHead className="text-right">On-Chain Tx</TableHead>
+              </TableRow>
+            </TableHeader>
           <TableBody>
             {sorted.map((runner, index) => {
               const rank = runner.finish_position ?? index + 1;
@@ -238,6 +240,7 @@ export function LeaderboardTable({
             })}
           </TableBody>
         </Table>
+        </ScrollArea>
       </div>
 
       <Dialog
