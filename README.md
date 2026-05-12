@@ -1,16 +1,16 @@
 # SolaRun: IoT-Blockchain Marathon Platform
 
-SolaRun adalah platform manajemen balap maraton berbasis Solana yang mengintegrasikan sensor RFID IoT dengan smart contract untuk pendaftaran yang transparan, pelacakan langsung (live tracking), dan distribusi hadiah otomatis.
+SolaRun is a Solana-based marathon race management system that integrates IoT RFID sensors with smart contracts for transparent registration, live tracking, and automated prize distribution.
 
 ## 🚀 Overview
-SolaRun memecahkan masalah transparansi dan keterlambatan pembayaran dalam event olahraga dengan memindahkan seluruh siklus hidup balapan ke on-chain. Dengan menggunakan sensor RFID di setiap checkpoint, data pelari divalidasi secara real-time dan hasil akhir memicu distribusi hadiah otomatis dari vault smart contract.
+SolaRun solves the issues of transparency and payment delays in sporting events by moving the entire race lifecycle on-chain. Using RFID sensors at every checkpoint, runner data is validated in real-time, and the final results automatically trigger prize distribution from a smart contract vault.
 
-### Fitur Utama:
-- **Winner-Only Prize Pool:** Hadiah didistribusikan kepada 4 pemenang teratas (40%, 30%, 20%, 10%).
-- **IoT-Blockchain Integration:** Checkpoint RFID secara otomatis mengirim data ke backend yang kemudian mencatat penyelesaian balapan on-chain.
-- **Mock USDC & Yield:** Pendaftaran menggunakan Mock USDC (SPL Token) yang dapat di-faucet langsung di aplikasi.
-- **Frictionless Onboarding:** Integrasi Privy untuk social login dan embedded wallet bagi pengguna non-kripto.
-- **DeFi Staking:** Admin menyetor jaminan (stake) untuk menjamin keberlangsungan event.
+### Key Features:
+- **Winner-Only Prize Pool:** Prizes are automatically distributed to the top 4 finishers (40%, 30%, 20%, 10%).
+- **IoT-Blockchain Integration:** RFID checkpoints automatically transmit data to the backend, which records race completion on-chain.
+- **Mock USDC & Yield:** Registration uses Mock USDC (SPL Token), which can be claimed directly via the in-app faucet.
+- **Frictionless Onboarding:** Privy integration provides social login and embedded wallets for non-crypto users.
+- **DeFi Staking:** Admins deposit a collateral (stake) to guarantee the event's integrity.
 
 ---
 
@@ -19,8 +19,9 @@ SolaRun memecahkan masalah transparansi dan keterlambatan pembayaran dalam event
 | Component | Address |
 |-----------|---------|
 | **Program ID** | `E8KF9A7PiYbi3UmZTDy4RFnJYsvjmo3oQ7NwTuGzR2C8` |
-| **Mock USDC Mint** | *(PDA: `mock_usdc_mint` dari Program ID)* |
-| **Global State** | *(PDA: `global_state`)* |
+| **Mock USDC Mint** | `PDA ("mock_usdc_mint")` |
+| **Global State** | `PDA ("global_state")` |
+| **Vault Address** | `9aQ2pU9vK3xL8mN5bR2cF7gH1jK4qO8pZ9vX2yA3bC4` (Example from .env) |
 
 ---
 
@@ -31,14 +32,14 @@ SolaRun memecahkan masalah transparansi dan keterlambatan pembayaran dalam event
 - **Styling:** Tailwind CSS + shadcn/ui
 - **Auth/Wallet:** Privy SDK (Social Login + Embedded Wallet)
 - **State Management:** TanStack Query (React Query)
-- **Maps:** Leaflet.js (untuk rute maraton)
+- **Maps:** Leaflet.js (for marathon routes)
 
 ### Backend
 - **Runtime:** Node.js (TypeScript)
 - **Framework:** Express.js
 - **Database:** Supabase (PostgreSQL + Realtime)
 - **IoT Protocol:** MQTT (via HiveMQ / Mosquitto)
-- **Scheduler:** Node-cron (untuk pengolahan refund otomatis)
+- **Scheduler:** Node-cron (for automated refund/prize processing)
 
 ### Smart Contract
 - **Language:** Rust
@@ -52,56 +53,56 @@ SolaRun memecahkan masalah transparansi dan keterlambatan pembayaran dalam event
 
 ---
 
-## 🔄 Flow Penggunaan Aplikasi
+## 🔄 Application Usage Flow
 
-1. **Social Login:** User masuk menggunakan Email/Google melalui Privy. Privy otomatis membuatkan wallet Solana.
-2. **Faucet:** User mengklaim Mock USDC gratis dari menu Profile/Faucet untuk biaya pendaftaran.
-3. **Pendaftaran:** User memilih event di halaman "Explore" dan mendaftar dengan membayar sejumlah Mock USDC.
-4. **Balapan (IoT):**
-   - User melakukan tap RFID di sensor **Start** (Checkpoint 0).
-   - User melakukan tap di **Intermediate Checkpoint** (Checkpoint 1).
-   - User melakukan tap di **Finish Line** (Checkpoint 2).
-5. **Leaderboard:** Hasil balapan muncul secara real-time di frontend melalui sinkronisasi Supabase Realtime.
-6. **Klaim Hadiah:** Setelah event selesai dan diverifikasi, hadiah otomatis dikirim ke wallet pemenang melalui instruksi `process_refunds` on-chain.
+1. **Social Login:** Users log in using Email/Google via Privy. Privy automatically generates a Solana embedded wallet.
+2. **Faucet:** Users claim free Mock USDC from the Profile/Faucet menu to pay for registration fees.
+3. **Registration:** Users select an event on the "Explore" page and register by paying the Mock USDC fee.
+4. **The Race (IoT):**
+   - User taps RFID at the **Start** sensor (Checkpoint 0).
+   - User taps at the **Intermediate Checkpoint** (Checkpoint 1).
+   - User taps at the **Finish Line** (Checkpoint 2).
+5. **Leaderboard:** Race results appear in real-time on the frontend via Supabase Realtime synchronization.
+6. **Prize Claim:** Once the event is completed and verified, prizes are automatically sent to the winners' wallets via the `process_refunds` on-chain instruction.
 
 ---
 
-## 🎥 Flow Demo (Simulasi)
+## 🎥 Demo Flow (Simulation)
 
-Untuk keperluan demo tanpa hardware fisik, kami menyediakan skrip simulasi:
+To test the system without physical hardware, we provide a simulation script:
 
-1. **Setup:** Jalankan backend dan frontend. Pastikan Supabase sudah terkonfigurasi.
-2. **Create Event:** Gunakan UI untuk membuat event baru dengan 3 checkpoint (0, 1, 2).
-3. **Register Runners:** Daftarkan 5-10 pelari (bisa menggunakan skrip `backend/src/scripts/spawn-dummy-users.ts`).
-4. **Simulate Race:** Jalankan skrip simulasi:
+1. **Setup:** Start the backend and frontend. Ensure Supabase is configured.
+2. **Create Event:** Use the UI to create a new event with 3 checkpoints (0, 1, 2).
+3. **Register Runners:** Register 5-10 runners (you can use the `backend/src/scripts/spawn-dummy-users.ts` script).
+4. **Simulate Race:** Run the simulation script:
    ```bash
    cd backend
    npx tsx src/simulate-full-race.ts
    ```
-   Skrip ini akan mempublikasikan pesan MQTT seolah-olah sensor RFID sedang di-tap.
-5. **Verify On-Chain:** Lihat status event berubah menjadi `Completed` di dashboard, dan periksa transaksi distribusi hadiah di Solscan (Devnet).
+   This script will publish MQTT messages as if RFID sensors were being tapped.
+5. **Verify On-Chain:** Watch the event status change to `Completed` on the dashboard, and check the prize distribution transactions on Solscan (Devnet).
 
 ---
 
-## 🧠 Logika Bisnis
+## 🧠 Business Logic
 
-### 1. Validasi Checkpoint
-Runner harus melewati checkpoint secara berurutan:
+### 1. Checkpoint Validation
+Runners must pass through checkpoints in sequential order:
 - **0 (Start) ➔ 1 (Checkpoint) ➔ 2 (Finish)**
-- Tap di checkpoint yang salah atau melompati urutan akan menyebabkan diskualifikasi otomatis oleh sistem backend.
-- *Anti-Cheat:* Delay minimum antara tap di sensor yang sama adalah 30 detik.
+- Tapping at the wrong checkpoint or skipping the sequence will lead to automatic disqualification by the backend system.
+- *Anti-Cheat:* A minimum 30-second delay is enforced between taps at the same sensor.
 
-### 2. Distribusi Hadiah (Prize Pool)
-Total dana pendaftaran di vault (setelah dipotong fee protokol) dibagikan kepada finisher dengan rasio:
-- **Juara 1:** 40%
-- **Juara 2:** 30%
-- **Juara 3:** 20%
-- **Juara 4:** 10%
-Jika finisher kurang dari 4, sisa hadiah akan tetap berada di vault atau dikembalikan ke treasury sesuai kebijakan event.
+### 2. Prize Pool Distribution
+Total registration funds in the vault (after protocol fees) are distributed to finishers with the following ratio:
+- **1st Place:** 40%
+- **2nd Place:** 30%
+- **3rd Place:** 20%
+- **4th Place:** 10%
+If there are fewer than 4 finishers, the remaining prizes stay in the vault or are returned to the treasury as per event policy.
 
-### 3. Staking & Keamanan
-- **Admin Stake:** Creator wajib melakukan deposit Mock USDC sebagai jaminan. Jika event dibatalkan secara sepihak setelah pendaftaran dibuka, dana stake ini dapat digunakan untuk kompensasi peserta.
-- **Dispute Period:** Dana ditahan selama periode tertentu setelah balapan selesai sebelum dapat diklaim sepenuhnya untuk memungkinkan verifikasi manual jika ada kecurangan.
+### 3. Staking & Security
+- **Admin Stake:** Creators are required to deposit Mock USDC as collateral. If an event is cancelled unilaterally after registration opens, this stake is used to compensate participants.
+- **Dispute Period:** Funds are held for a specific period after the race ends before they can be fully claimed to allow for manual verification in case of cheating reports.
 
 ---
 
