@@ -17,6 +17,9 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -556,14 +559,14 @@ export default function CreateEventPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-xl">
             {/* ── Left Column: Primary Config ────────────────── */}
             <div className="lg:col-span-7 space-y-xl">
-              <section className="space-y-lg">
+              <section className="grid grid-cols-1 lg:grid-cols-2 gap-lg">
                 {/* Creator Address */}
-                <div className="flex flex-col gap-sm">
-                  <label className="font-label-caps text-label-caps text-on-surface-variant">
+                <div className="flex flex-col gap-sm lg:col-span-2">
+                  <Label className="font-label-caps text-label-caps text-on-surface-variant">
                     CREATOR_ADDRESS
-                  </label>
-                  <input
-                    className="w-full border-2 border-outline-variant bg-transparent p-md font-body-sm text-on-surface-variant cursor-not-allowed"
+                  </Label>
+                  <Input
+                    className="w-full border-2 border-outline-variant bg-transparent p-md h-auto font-body-sm text-on-surface-variant cursor-not-allowed rounded-none"
                     readOnly
                     type="text"
                     value={walletAddress ?? "LOADING..."}
@@ -572,11 +575,11 @@ export default function CreateEventPage() {
 
                 {/* Event Name */}
                 <div className="flex flex-col gap-sm">
-                  <label className="font-label-caps text-label-caps">
+                  <Label className="font-label-caps text-label-caps">
                     EVENT_NAME
-                  </label>
-                  <input
-                    className="w-full border-2 border-primary bg-transparent p-md font-body-lg text-primary focus:border-primary focus:outline-none"
+                  </Label>
+                  <Input
+                    className="w-full border-2 border-primary bg-transparent p-md h-auto font-body-lg text-primary focus:border-primary focus:outline-none rounded-none"
                     placeholder="ENTER_RACE_IDENTIFIER"
                     type="text"
                     value={name}
@@ -590,11 +593,11 @@ export default function CreateEventPage() {
 
                 {/* Event Location */}
                 <div className="flex flex-col gap-sm">
-                  <label className="font-label-caps text-label-caps">
+                  <Label className="font-label-caps text-label-caps">
                     LOCATION_NAME
-                  </label>
-                  <input
-                    className="w-full border-2 border-primary bg-transparent p-md font-body-lg text-primary focus:border-primary focus:outline-none"
+                  </Label>
+                  <Input
+                    className="w-full border-2 border-primary bg-transparent p-md h-auto font-body-lg text-primary focus:border-primary focus:outline-none rounded-none"
                     placeholder="E.G. MONAS, JAKARTA"
                     type="text"
                     value={locationName}
@@ -607,12 +610,12 @@ export default function CreateEventPage() {
                 </div>
 
                 {/* Race Specifications */}
-                <div className="flex flex-col gap-sm">
-                  <label className="font-label-caps text-label-caps">
+                <div className="flex flex-col gap-sm lg:col-span-2">
+                  <Label className="font-label-caps text-label-caps">
                     RACE_SPECIFICATIONS
-                  </label>
-                  <textarea
-                    className="w-full border-2 border-primary bg-transparent p-md font-body-sm text-primary focus:border-primary focus:outline-none resize-none"
+                  </Label>
+                  <Textarea
+                    className="w-full border-2 border-primary bg-transparent p-md font-body-sm text-primary focus:border-primary focus:outline-none resize-none rounded-none"
                     placeholder="DEFINE_OBJECTIVES_AND_REWARDS"
                     rows={6}
                     value={description}
@@ -622,13 +625,13 @@ export default function CreateEventPage() {
                 </div>
 
                 {/* Date / Time / Duration / Lock */}
-                <div className="grid grid-cols-4 gap-gutter">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-gutter lg:col-span-2">
                   <div className="flex flex-col gap-sm">
-                    <label className="font-label-caps text-label-caps">
+                    <Label className="font-label-caps text-label-caps">
                       GENESIS_DATE
-                    </label>
-                    <input
-                      className="w-full border-2 border-primary bg-transparent p-md font-body-sm text-primary focus:outline-none"
+                    </Label>
+                    <Input
+                      className="w-full border-2 border-primary bg-transparent p-md h-auto font-body-sm text-primary focus:outline-none rounded-none"
                       type="date"
                       min={new Date().toISOString().split("T")[0]}
                       value={startDate}
@@ -640,11 +643,11 @@ export default function CreateEventPage() {
                     />
                   </div>
                   <div className="flex flex-col gap-sm">
-                    <label className="font-label-caps text-label-caps">
+                    <Label className="font-label-caps text-label-caps">
                       START_TIME_UTC
-                    </label>
-                    <input
-                      className="w-full border-2 border-primary bg-transparent p-md font-body-sm text-primary focus:outline-none"
+                    </Label>
+                    <Input
+                      className="w-full border-2 border-primary bg-transparent p-md h-auto font-body-sm text-primary focus:outline-none rounded-none"
                       type="time"
                       value={startTime}
                       onChange={(e) => {
@@ -655,11 +658,11 @@ export default function CreateEventPage() {
                     />
                   </div>
                   <div className="flex flex-col gap-sm">
-                    <label className="font-label-caps text-label-caps">
+                    <Label className="font-label-caps text-label-caps">
                       EVENT_DURATION (HRS)
-                    </label>
-                    <input
-                      className="w-full border-2 border-primary bg-transparent p-md font-body-sm text-primary focus:outline-none"
+                    </Label>
+                    <Input
+                      className="w-full border-2 border-primary bg-transparent p-md h-auto font-body-sm text-primary focus:outline-none rounded-none"
                       type="number"
                       step="0.5"
                       min="0.5"
@@ -673,11 +676,11 @@ export default function CreateEventPage() {
                     />
                   </div>
                   <div className="flex flex-col gap-sm">
-                    <label className="font-label-caps text-label-caps">
+                    <Label className="font-label-caps text-label-caps">
                       DISPUTE_LOCK (HRS)
-                    </label>
-                    <input
-                      className="w-full border-2 border-primary bg-transparent p-md font-body-sm text-primary focus:outline-none"
+                    </Label>
+                    <Input
+                      className="w-full border-2 border-primary bg-transparent p-md h-auto font-body-sm text-primary focus:outline-none rounded-none"
                       type="number"
                       min="0"
                       placeholder="24"
@@ -692,14 +695,14 @@ export default function CreateEventPage() {
                 </div>
 
                 {/* Fee & Max Participants */}
-                <div className="grid grid-cols-2 gap-gutter">
+                <div className="grid grid-cols-2 gap-gutter lg:col-span-2">
                   <div className="flex flex-col gap-sm">
-                    <label className="font-label-caps text-label-caps">
+                    <Label className="font-label-caps text-label-caps">
                       PROTOCOL_FEE_USDC
-                    </label>
+                    </Label>
                     <div className="relative">
-                      <input
-                        className="w-full border-2 border-primary bg-transparent p-md font-data-lg text-primary focus:outline-none"
+                      <Input
+                        className="w-full border-2 border-primary bg-transparent p-md h-auto font-data-lg text-primary focus:outline-none rounded-none pr-xl"
                         placeholder="0.00"
                         step="0.01"
                         min="0.01"
@@ -717,11 +720,11 @@ export default function CreateEventPage() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-sm">
-                    <label className="font-label-caps text-label-caps">
+                    <Label className="font-label-caps text-label-caps">
                       MAX_PARTICIPANTS
-                    </label>
-                    <input
-                      className="w-full border-2 border-primary bg-transparent p-md font-data-lg text-primary focus:outline-none"
+                    </Label>
+                    <Input
+                      className="w-full border-2 border-primary bg-transparent p-md h-auto font-data-lg text-primary focus:outline-none rounded-none"
                       type="number"
                       min="2"
                       placeholder="100"
@@ -736,11 +739,11 @@ export default function CreateEventPage() {
                 </div>
 
                 {/* Stake Collateral — Fixed 50% of total prize pool */}
-                <div className="flex flex-col gap-sm">
+                <div className="flex flex-col gap-sm lg:col-span-2">
                   <div className="flex items-center justify-between">
-                    <label className="font-label-caps text-label-caps">
+                    <Label className="font-label-caps text-label-caps">
                       STAKE_COLLATERAL
-                    </label>
+                    </Label>
                     <span className="font-label-caps text-[10px] bg-orange-600 text-background px-xs py-1">
                       REQUIRED · 50% PRIZE POOL
                     </span>

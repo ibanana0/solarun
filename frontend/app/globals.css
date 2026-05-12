@@ -110,3 +110,20 @@
     color: #c4c7c8 !important;
     font-size: 10px !important;
 }
+
+@layer utilities {
+  .hover-card {
+    @apply transition-all duration-200 ease-in-out cursor-pointer border-2;
+  }
+
+  .hover-card:hover {
+    @apply brightness-110 shadow-lg;
+    background-color: hsl(var(--accent) / 0.5);
+  }
+
+  .hover-card-dark:hover {
+    @apply brightness-90 shadow-lg;
+    background-color: hsl(var(--primary) / 0.1);
+  }
+}
+

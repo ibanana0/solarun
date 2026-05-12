@@ -82,7 +82,7 @@ export default function EarningsBreakdownCard({
   const isSlashed = stakeStatus === "slashed";
 
   return (
-    <div className="border-2 border-primary p-lg space-y-lg">
+    <div className="border-2 border-primary p-lg space-y-lg hover-card transition-all">
       <div className="flex items-center justify-between">
         <h3 className="font-headline-md text-headline-md text-primary uppercase">
           💰 Earnings Breakdown

@@ -72,8 +72,8 @@ function RaceCard({ event }: { event: RaceEvent }) {
 
     return (
         <div
-            className={`border-2 border-primary p-lg flex flex-col gap-lg relative transition-none
-                ${settled ? 'bg-surface-container-lowest' : 'hover:bg-surface-container-lowest'}`}
+            className={`p-lg flex flex-col gap-lg relative hover-card transition-all
+                ${settled ? 'bg-surface-container-lowest opacity-60' : 'bg-background'}`}
         >
             {/* Header row: status + name | prize pool */}
             <div className={`flex justify-between items-start ${settled ? 'opacity-40' : ''}`}>
@@ -112,10 +112,10 @@ function RaceCard({ event }: { event: RaceEvent }) {
             {/* CTA button */}
             <Button
                 asChild
-                className={`w-full border-2 py-md font-label-caps text-label-caps transition-none active:translate-y-1 h-auto rounded-none bg-transparent 
+                className={`w-full border-2 py-md font-label-caps text-label-caps transition-all active:translate-y-1 h-auto rounded-none 
                     ${settled 
-                        ? 'border-outline text-on-surface-variant hover:bg-surface-container hover:text-primary' 
-                        : 'border-primary text-primary hover:bg-primary hover:text-on-primary'}`}
+                        ? 'bg-transparent border-outline text-on-surface-variant hover:bg-surface-container hover:text-primary' 
+                        : 'bg-primary text-primary-foreground border-primary hover:bg-primary/90'}`}
             >
                 <Link href={`/event/${event.id}`}>
                     {settled ? 'VIEW ARCHIVE' : completed ? 'VIEW RESULTS' : (event.status === 'active' || event.status === 'Active') ? 'WATCH LIVE' : 'ENTER RACE'}

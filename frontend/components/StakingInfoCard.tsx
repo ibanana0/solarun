@@ -37,7 +37,7 @@ export default function StakingInfoCard({
   const requiredStake = registrationFee * maxParticipants * 0.5; // Fixed 50% of max prize pool
 
   return (
-    <div className="border-2 border-primary p-lg space-y-lg">
+    <div className="border-2 border-primary p-lg space-y-lg hover-card transition-all">
       <h3 className="font-headline-md text-headline-md text-primary uppercase border-b-2 border-primary pb-sm">
         💰 STAKING & EARNINGS
       </h3>
