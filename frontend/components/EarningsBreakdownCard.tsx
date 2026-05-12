@@ -14,8 +14,15 @@ import {
   AlertCircle,
   Loader2,
   ExternalLink,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
 
 interface EarningsBreakdownCardProps {
   eventId: string;
@@ -49,6 +56,7 @@ export default function EarningsBreakdownCard({
   const [claiming, setClaiming] = useState(false);
   const [claimTxSig, setClaimTxSig] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -90,75 +98,6 @@ export default function EarningsBreakdownCard({
         >
           {stakeStatus.toUpperCase()}
         </span>
-      </div>
-
-      {/* ── Revenue Sources ────────────────────────────────── */}
-      <div className="space-y-sm">
-        <p className="font-label-caps text-label-caps text-on-surface-variant uppercase">
-          Revenue Sources
-        </p>
-        <div className="space-y-xs bg-surface-container p-md rounded-sm">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-sm">
-              <TrendingUp className="h-4 w-4 text-success" />
-              <span className="font-body-sm text-on-surface-variant">
-                Registration Deposits ({participantCount} participants)
-              </span>
-            </div>
-            <span className="font-data-md text-success">
-              +{totalDeposits.toFixed(2)} USDC
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-sm">
-              <Zap className="h-4 w-4 text-orange-500" />
-              <span className="font-body-sm text-on-surface-variant">
-                Your Stake
-              </span>
-            </div>
-            <span className="font-data-md text-orange-500">
-              +{stakeAmount.toFixed(2)} USDC
-            </span>
-          </div>
-          <div className="border-t border-outline-variant pt-xs flex justify-between font-label-caps">
-            <span className="text-on-surface-variant">Gross Amount</span>
-            <span className="font-data-md text-primary">
-              {grossAmount.toFixed(2)} USDC
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Fee Breakdown ────────────────────────────────────── */}
-      <div className="space-y-sm">
-        <p className="font-label-caps text-label-caps text-on-surface-variant uppercase">
-          Protocol Fee Deduction
-        </p>
-        <div className="space-y-xs bg-surface-container p-md rounded-sm border border-error/30">
-          <div className="flex justify-between items-center">
-            <span className="font-body-sm text-on-surface-variant">
-              Protocol Fee Rate
-            </span>
-            <span className="font-data-md text-error">{feePercentage}%</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="font-body-sm text-on-surface-variant">
-              Calculated from: {grossAmount.toFixed(2)} USDC × {protocolFeeBps}{" "}
-              bps
-            </span>
-            <span className="font-data-md text-error">
-              -{feeAmount.toFixed(2)} USDC
-            </span>
-          </div>
-          {treasuryFeeCollected > 0 && (
-            <div className="flex justify-between items-center text-on-surface-variant text-body-xs">
-              <span>Fee Sent to Treasury</span>
-              <span className="text-error">
-                {treasuryFeeCollected.toFixed(2)} USDC
-              </span>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* ── Net Amount (Claimable) ───────────────────────── */}
@@ -211,9 +150,17 @@ export default function EarningsBreakdownCard({
             )}
             <span className="font-body-sm font-bold uppercase">
               {stakeStatus === "pending" && "Awaiting Deposit"}
-              {stakeStatus === "staked" && isCompletedOrSettled && isLockedByDispute && "Deposited & Dispute Locked"}
-              {stakeStatus === "staked" && isCompletedOrSettled && !isLockedByDispute && "Ready to Claim"}
-              {stakeStatus === "staked" && !isCompletedOrSettled && "Deposited & Locked"}
+              {stakeStatus === "staked" &&
+                isCompletedOrSettled &&
+                isLockedByDispute &&
+                "Deposited & Dispute Locked"}
+              {stakeStatus === "staked" &&
+                isCompletedOrSettled &&
+                !isLockedByDispute &&
+                "Ready to Claim"}
+              {stakeStatus === "staked" &&
+                !isCompletedOrSettled &&
+                "Deposited & Locked"}
               {stakeStatus === "returned" && "Returned to You"}
               {stakeStatus === "slashed" && "Forfeited as Penalty"}
             </span>
@@ -221,11 +168,17 @@ export default function EarningsBreakdownCard({
           <p className="font-body-xs text-on-surface-variant">
             {stakeStatus === "pending" &&
               "You must call stake_event on blockchain before starting."}
-            {stakeStatus === "staked" && !isCompletedOrSettled &&
+            {stakeStatus === "staked" &&
+              !isCompletedOrSettled &&
               "Your stake is locked in the smart contract until event completion."}
-            {stakeStatus === "staked" && isCompletedOrSettled && isLockedByDispute && unlockDate &&
+            {stakeStatus === "staked" &&
+              isCompletedOrSettled &&
+              isLockedByDispute &&
+              unlockDate &&
               `Your stake is locked in the smart contract until the 7-day dispute period ends on ${unlockDate.toLocaleDateString()} at ${unlockDate.toLocaleTimeString()}.`}
-            {stakeStatus === "staked" && isCompletedOrSettled && !isLockedByDispute &&
+            {stakeStatus === "staked" &&
+              isCompletedOrSettled &&
+              !isLockedByDispute &&
               "Dispute period ended. You can now claim your stake and earnings."}
             {stakeStatus === "returned" &&
               "Your stake has been returned (minus protocol fee)."}
@@ -235,40 +188,142 @@ export default function EarningsBreakdownCard({
         </div>
       </div>
 
-      {/* ── Summary Table ─────────────────────────────────── */}
-      <div className="border-2 border-outline-variant p-md space-y-xs">
-        <p className="font-label-caps text-label-caps text-on-surface-variant uppercase mb-md">
-          Summary
-        </p>
-        <div className="space-y-xs text-sm">
-          <div className="flex justify-between py-xs">
-            <span className="text-on-surface-variant">Event Status:</span>
-            <span className="font-bold text-primary uppercase">{status}</span>
-          </div>
-          <div className="flex justify-between py-xs">
-            <span className="text-on-surface-variant">Total Participants:</span>
-            <span className="font-data-md">{participantCount}</span>
-          </div>
-          <div className="flex justify-between py-xs border-t border-outline-variant pt-xs">
-            <span className="text-on-surface-variant">Gross Vault:</span>
-            <span className="font-data-md text-primary">
-              {grossAmount.toFixed(2)} USDC
+      {/* ── Collapsible Breakdown ───────────────────────── */}
+      <Collapsible
+        open={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+        className="space-y-sm"
+      >
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full justify-between uppercase font-label-caps text-xs border-outline-variant hover:bg-surface-container transition-none"
+          >
+            <span>
+              {isDetailsOpen ? "Hide Details" : "View Breakdown Details"}
             </span>
+            {isDetailsOpen ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-lg pt-md">
+          {/* ── Revenue Sources ────────────────────────────────── */}
+          <div className="space-y-sm">
+            <p className="font-label-caps text-label-caps text-on-surface-variant uppercase">
+              Revenue Sources
+            </p>
+            <div className="space-y-xs bg-surface-container p-md rounded-sm">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-sm">
+                  <TrendingUp className="h-4 w-4 text-success" />
+                  <span className="font-body-sm text-on-surface-variant">
+                    Registration Deposits ({participantCount} participants)
+                  </span>
+                </div>
+                <span className="font-data-md text-success">
+                  +{totalDeposits.toFixed(2)} USDC
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-sm">
+                  <Zap className="h-4 w-4 text-orange-500" />
+                  <span className="font-body-sm text-on-surface-variant">
+                    Your Stake
+                  </span>
+                </div>
+                <span className="font-data-md text-orange-500">
+                  +{stakeAmount.toFixed(2)} USDC
+                </span>
+              </div>
+              <div className="border-t border-outline-variant pt-xs flex justify-between font-label-caps">
+                <span className="text-on-surface-variant">Gross Amount</span>
+                <span className="font-data-md text-primary">
+                  {grossAmount.toFixed(2)} USDC
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="flex justify-between py-xs text-error">
-            <span className="text-on-surface-variant">
-              Protocol Fee ({feePercentage}%):
-            </span>
-            <span className="font-data-md">-{feeAmount.toFixed(2)} USDC</span>
+
+          {/* ── Fee Breakdown ────────────────────────────────────── */}
+          <div className="space-y-sm">
+            <p className="font-label-caps text-label-caps text-on-surface-variant uppercase">
+              Protocol Fee Deduction
+            </p>
+            <div className="space-y-xs bg-surface-container p-md rounded-sm border border-error/30">
+              <div className="flex justify-between items-center">
+                <span className="font-body-sm text-on-surface-variant">
+                  Protocol Fee Rate
+                </span>
+                <span className="font-data-md text-error">
+                  {feePercentage}%
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-body-sm text-on-surface-variant">
+                  Calculated from: {grossAmount.toFixed(2)} USDC ×{" "}
+                  {protocolFeeBps} bps
+                </span>
+                <span className="font-data-md text-error">
+                  -{feeAmount.toFixed(2)} USDC
+                </span>
+              </div>
+              {treasuryFeeCollected > 0 && (
+                <div className="flex justify-between items-center text-on-surface-variant text-body-xs">
+                  <span>Fee Sent to Treasury</span>
+                  <span className="text-error">
+                    {treasuryFeeCollected.toFixed(2)} USDC
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex justify-between py-xs border-t-2 border-primary pt-xs font-headline-sm">
-            <span className="text-primary">Net to You:</span>
-            <span className="text-primary font-data-lg">
-              {netAmount.toFixed(2)} USDC
-            </span>
+
+          {/* ── Summary Table ─────────────────────────────────── */}
+          <div className="border-2 border-outline-variant p-md space-y-xs">
+            <p className="font-label-caps text-label-caps text-on-surface-variant uppercase mb-md">
+              Summary
+            </p>
+            <div className="space-y-xs text-sm">
+              <div className="flex justify-between py-xs">
+                <span className="text-on-surface-variant">Event Status:</span>
+                <span className="font-bold text-primary uppercase">
+                  {status}
+                </span>
+              </div>
+              <div className="flex justify-between py-xs">
+                <span className="text-on-surface-variant">
+                  Total Participants:
+                </span>
+                <span className="font-data-md">{participantCount}</span>
+              </div>
+              <div className="flex justify-between py-xs border-t border-outline-variant pt-xs">
+                <span className="text-on-surface-variant">Gross Vault:</span>
+                <span className="font-data-md text-primary">
+                  {grossAmount.toFixed(2)} USDC
+                </span>
+              </div>
+              <div className="flex justify-between py-xs text-error">
+                <span className="text-on-surface-variant">
+                  Protocol Fee ({feePercentage}%):
+                </span>
+                <span className="font-data-md">
+                  -{feeAmount.toFixed(2)} USDC
+                </span>
+              </div>
+              <div className="flex justify-between py-xs border-t-2 border-primary pt-xs font-headline-sm">
+                <span className="text-primary">Net to You:</span>
+                <span className="text-primary font-data-lg">
+                  {netAmount.toFixed(2)} USDC
+                </span>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* ── Action Button ─────────────────────────────────── */}
       {isCompletedOrSettled && stakeStatus === "staked" && (
