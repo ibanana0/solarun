@@ -24,7 +24,7 @@ import {
   getVaultBalance,
 } from "../blockchain/transaction-signer";
 import { Transaction, Keypair, PublicKey } from "@solana/web3.js";
-import { BN } from "@coral-xyz/anchor";
+import BN from "bn.js";
 import { calculatePrizePool } from "../lib/prize-calculator";
 import { cleanupStuckTransactions } from "../workers/optimistic-cleanup";
 
